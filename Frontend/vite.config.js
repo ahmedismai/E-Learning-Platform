@@ -9,12 +9,11 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
     proxy: {
       "/api": {
-        target: "http://localhost:5282",
+        target: "http://e-learning-platform-3.runasp.net/swagger/index.html",
         changeOrigin: true,
       },
     },
     fs: {
-      // السماح لـ Vite بالوصول إلى الملفات في المجلد الرئيسي والمجلدات الأب
       allow: [
         path.resolve(__dirname),
         path.resolve(__dirname, ".."),
