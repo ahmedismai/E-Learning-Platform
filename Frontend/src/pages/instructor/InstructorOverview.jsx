@@ -23,6 +23,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getFullUrl } from "@/lib/urlHelper";
 
 const InstructorOverview = () => {
   const { user } = useAuth();
@@ -30,7 +31,7 @@ const InstructorOverview = () => {
   const { data: stats, isLoading } = useQuery({
     queryKey: ["instructor", "stats"],
     queryFn: async () => {
-      const response = await api.get("/Dashboard/InstructorDashboard");
+      const response = await api.get("/Dashboards/InstructorDashboard");
       return response.data;
     },
   });
@@ -107,7 +108,7 @@ const InstructorOverview = () => {
             <div className="flex-1 text-center md:text-left space-y-2">
                <h2 className="text-2xl font-black tracking-tight">AI Content Creation Tools</h2>
                <p className="text-muted-foreground max-w-xl">
-                  Save time using our AI generators. Create comprehensive final exams or quickly generate quizzes and assignments inside your course content.
+                  Save time using our AI generators. Create comprehensive final exams or quickly generate quizzes inside your course content.
                </p>
             </div>
             <div className="flex flex-col gap-3">
@@ -153,15 +154,37 @@ const InstructorOverview = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-primary" />
-              Engagement Overview
+              Recent Enrollments
             </CardTitle>
-            <CardDescription>How your students are interacting with your content</CardDescription>
+            <CardDescription>New students joining your courses</CardDescription>
           </CardHeader>
-          <CardContent className="h-[300px] flex items-center justify-center border-2 border-dashed rounded-xl m-6 mt-0">
-             <div className="text-center space-y-2">
-               <FileText className="w-10 h-10 text-muted-foreground/30 mx-auto" />
-               <p className="text-muted-foreground text-sm font-medium">Performance charts will appear here as you get more enrollments</p>
-             </div>
+          <CardContent>
+            <div className="space-y-4">
+              {stats?.recentEnrollments?.map((enrollment) => (
+                <div key={enrollment.enrollmentId} className="flex items-center justify-between p-3 border rounded-xl hover:bg-muted/50 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <img 
+                      src={getFullUrl(enrollment.courseImage)} 
+                      alt={enrollment.courseTitle}
+                      className="w-10 h-10 rounded-lg object-cover"
+                    />
+                    <div>
+                      <p className="text-sm font-bold">{enrollment.studentName}</p>
+                      <p className="text-[10px] text-muted-foreground uppercase">{enrollment.courseTitle}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase">Enrolled</p>
+                    <p className="text-xs">{new Date(enrollment.enrolledAt).toLocaleDateString()}</p>
+                  </div>
+                </div>
+              ))}
+              {!stats?.recentEnrollments?.length && (
+                <div className="h-[200px] flex items-center justify-center text-muted-foreground italic text-sm">
+                   No recent enrollments yet.
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 
@@ -186,9 +209,9 @@ const InstructorOverview = () => {
               </Link>
             </Button>
             <Button variant="outline" asChild className="h-24 flex-col gap-2">
-              <Link to="/dashboard/quizzes">
+              <Link to="/dashboard/exams">
                 <FileText className="w-6 h-6 text-warning" />
-                <span>Manage Quizzes</span>
+                <span>Manage Exams</span>
               </Link>
             </Button>
             <Button variant="outline" asChild className="h-24 flex-col gap-2">

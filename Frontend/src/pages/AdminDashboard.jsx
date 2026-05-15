@@ -7,6 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -17,567 +18,313 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/components/ui/use-toast";
+import api from "@/api/axios";
 import {
   Users,
   BookOpen,
-  BarChart3,
-  CheckCircle2,
+  CheckCircle,
   XCircle,
-  Shield,
-  Activity,
-  TrendingUp,
-  DollarSign,
-  Trash2,
   Loader2,
-  Layers,
-  History,
-  Plus,
-  Pencil,
+  TrendingUp,
+  Clock,
+  Star,
+  Trash2,
+  Edit,
+  UserPlus
 } from "lucide-react";
-import api from "@/api/axios";
-import { toast } from "sonner";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import enrollmentService from "@/api/enrollment";
+import courseService from "@/api/course";
+import { getFullUrl } from "@/lib/urlHelper";
 
 const AdminDashboard = () => {
+  const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState("overview");
 
-  // Category State
-  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
-  const [editingCategory, setEditingCategory] = useState(null);
-  const [categoryData, setCategoryData] = useState({ name: "", description: "", image: null });
-
-  // Fetch Admin Dashboard Data
-  const { data: dashboardData, isLoading: statsLoading } = useQuery({
-    queryKey: ["admin", "stats"],
+  const { data: dashboardData, isLoading: isDashLoading } = useQuery({
+    queryKey: ["admin-dashboard"],
     queryFn: async () => {
       const response = await api.get("/Dashboards/AdminDashboard");
       return response.data;
     },
   });
 
-  const stats = dashboardData?.stats;
-
-  // Fetch Users
-  const { data: usersResponse, isLoading: usersLoading } = useQuery({
-    queryKey: ["admin", "users"],
-    queryFn: async () => {
-      const response = await api.get("/Account/Users");
-      return response.data;
-    },
+  // Fetch all enrollments
+  const { data: enrollmentsData, isLoading: isEnrollLoading } = useQuery({
+    queryKey: ["admin-enrollments"],
+    queryFn: enrollmentService.getAll,
   });
+  const allEnrollments = enrollmentsData?.data || [];
 
-  const users = usersResponse?.data || [];
-
-  // Fetch Courses (pending for approval)
-  const { data: pendingCoursesResponse, isLoading: coursesLoading } = useQuery({
-    queryKey: ["admin", "pending-courses"],
-    queryFn: async () => {
-      const response = await api.get("/Course/pending");
-      return response.data;
-    },
-  });
-
-  const pendingCourses = pendingCoursesResponse?.data || [];
-
-  // Fetch Categories
-  const { data: categoriesResponse, isLoading: categoriesLoading } = useQuery({
-    queryKey: ["admin", "categories"],
-    queryFn: async () => {
-      const response = await api.get("/Category");
-      return response.data;
-    },
-  });
-
-  const categories = categoriesResponse?.data || [];
-
-  // Mutations
-  const updateRoleMutation = useMutation({
-    mutationFn: async ({ userId, role }) => {
-      // The backend uses Role/AssignRole and Role/UnAssignRole or similar
-      // For simplicity, we'll try AssignRole
-      return await api.post(`/Role/AssignRole/${userId}/${role}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries(["admin", "users"]);
-      toast.success("User role updated successfully");
-    },
-    onError: () => toast.error("Failed to update user role"),
-  });
-
-  const deleteUserMutation = useMutation({
-    mutationFn: async (userId) => {
-      return await api.delete(`/Account/DeleteUser/${userId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries(["admin", "users"]);
-      toast.success("User deleted successfully");
-    },
-    onError: () => toast.error("Failed to delete user"),
-  });
-
-  const approveCourseMutation = useMutation({
-    mutationFn: async (courseId) => {
-      return await api.patch(`/Course/${courseId}/approve`, { isApproved: true });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries(["admin", "pending-courses"]);
-      queryClient.invalidateQueries(["admin", "stats"]);
-      toast.success("Course approved");
-    },
-    onError: () => toast.error("Failed to approve course"),
-  });
-
-  const categoryMutation = useMutation({
-    mutationFn: async (data) => {
-      const fd = new FormData();
-      fd.append("CategoryName", data.name);
-      fd.append("Description", data.description);
-      if (data.image) fd.append("ImgURL", data.image);
-
-      if (editingCategory) {
-        return await api.patch(`/Category/${editingCategory.categoryId}`, fd);
-      }
-      return await api.post("/Category", fd);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries(["admin", "categories"]);
-      toast.success(`Category ${editingCategory ? "updated" : "created"} successfully`);
-      setIsCategoryModalOpen(false);
-      setEditingCategory(null);
-      setCategoryData({ name: "", description: "", image: null });
-    },
-    onError: (error) => toast.error(error.response?.data?.message || "Operation failed"),
-  });
-
-  const deleteCategoryMutation = useMutation({
-    mutationFn: async (id) => await api.delete(`/Category/${id}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries(["admin", "categories"]);
-      toast.success("Category deleted");
-    },
-  });
-
-  const getFullUrl = (path) => {
-    if (!path) return "";
-    if (path.startsWith("http")) return path;
-    const baseUrl = api.defaults.baseURL.replace("/api", "");
-    return `${baseUrl}/${path.replace(/\\/g, "/")}`;
+  const stats = dashboardData?.stats || {
+    totalUsers: 0,
+    totalStudents: 0,
+    totalInstructors: 0,
+    totalCourses: 0,
+    pendingCourses: 0,
+    totalEnrollments: 0,
   };
 
-  const isLoading = statsLoading || usersLoading || coursesLoading || categoriesLoading;
+  const recentUsers = dashboardData?.recentActiveUsers || [];
+  const topCourses = dashboardData?.topCourses || [];
+
+  // Fetch all courses for management
+  const { data: coursesData, isLoading: isCoursesLoading } = useQuery({
+    queryKey: ["admin-courses"],
+    queryFn: () => courseService.getAll(),
+  });
+  const allCourses = coursesData?.data?.data || [];
+
+  // Approve Course Mutation
+  const approveMutation = useMutation({
+    mutationFn: async ({ courseId, approve }) => {
+      return courseService.approve(courseId, { 
+        isApproved: approve,
+        rejectionReason: approve ? "" : "Course content does not meet guidelines"
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(["admin-dashboard"]);
+      queryClient.invalidateQueries(["admin-courses"]);
+      toast({ title: "Course status updated!" });
+    },
+  });
+
+  // Delete Enrollment Mutation
+  const deleteEnrollmentMutation = useMutation({
+    mutationFn: enrollmentService.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries(["admin-enrollments"]);
+      queryClient.invalidateQueries(["admin-dashboard"]);
+      toast({ title: "Enrollment deleted successfully" });
+    },
+    onError: (error) => {
+      toast({
+        title: "Action failed",
+        description: error.response?.data?.message || "Could not delete enrollment",
+        variant: "destructive"
+      });
+    }
+  });
+
+  if (isDashLoading) return <div className="p-8 text-center"><Loader2 className="animate-spin inline mr-2" /> Loading Admin Dashboard...</div>;
 
   return (
-    <div className="space-y-6 animate-fade-in p-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">
-            Admin Control Panel
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Manage users, courses, and platform health
-          </p>
-        </div>
+    <div className="space-y-8 animate-fade-in max-w-7xl mx-auto pb-12">
+      <h1 className="text-3xl font-bold tracking-tight">Admin Control Center</h1>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <Card className="border-none shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Users className="w-4 h-4 text-primary" />
+              Total Platform Users
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{stats.totalUsers}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {stats.totalStudents} Students • {stats.totalInstructors} Instructors
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-none shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-blue-500" />
+              Total Courses
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{stats.totalCourses}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              <span className="text-amber-600 font-bold">{stats.pendingCourses} Pending Approval</span>
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-none shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-green-500" />
+              Total Enrollments
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{stats.totalEnrollments}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Active subscriptions across all courses
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
-      <Tabs
-        value={activeTab}
-        onValueChange={setActiveTab}
-        className="space-y-6"
-      >
-        <TabsList className="grid grid-cols-4 w-full lg:w-[500px]">
+      <Tabs defaultValue="overview" className="space-y-6">
+        <TabsList className="bg-background border">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="users">Users</TabsTrigger>
-          <TabsTrigger value="courses">Approvals</TabsTrigger>
-          <TabsTrigger value="categories">Categories</TabsTrigger>
+          <TabsTrigger value="courses">Course Management</TabsTrigger>
+          <TabsTrigger value="enrollments">Enrollments</TabsTrigger>
+          <TabsTrigger value="users">User Activity</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">
-                      Total Users
-                    </p>
-                    {statsLoading ? (
-                      <Skeleton className="h-8 w-16 mt-1" />
-                    ) : (
-                      <p className="text-3xl font-bold mt-1">
-                        {stats?.totalUsers}
-                      </p>
-                    )}
-                  </div>
-                  <div className="p-3 bg-primary/10 rounded-xl">
-                    <Users className="w-6 h-6 text-primary" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+             <Card>
+                <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Clock className="w-5 h-5 text-primary" /> Recent Active Users</CardTitle></CardHeader>
+                <CardContent>
+                   <div className="space-y-4">
+                      {recentUsers.map(user => (
+                        <div key={user.id} className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0">
+                           <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center font-bold text-xs text-primary">{user.fullName[0]}</div>
+                              <div>
+                                 <p className="text-sm font-bold">{user.fullName}</p>
+                                 <p className="text-[10px] text-muted-foreground">{user.email}</p>
+                              </div>
+                           </div>
+                           <Badge variant="outline" className="text-[10px]">Last: {new Date(user.lastActivity).toLocaleDateString()}</Badge>
+                        </div>
+                      ))}
+                   </div>
+                </CardContent>
+             </Card>
 
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">
-                      Total Courses
-                    </p>
-                    {statsLoading ? (
-                      <Skeleton className="h-8 w-16 mt-1" />
-                    ) : (
-                      <p className="text-3xl font-bold mt-1">
-                        {stats?.totalCourses}
-                      </p>
-                    )}
-                  </div>
-                  <div className="p-3 bg-accent/10 rounded-xl">
-                    <BookOpen className="w-6 h-6 text-accent" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">
-                      Pending Courses
-                    </p>
-                    {statsLoading ? (
-                      <Skeleton className="h-8 w-16 mt-1" />
-                    ) : (
-                      <p className="text-3xl font-bold mt-1 text-amber-500">
-                        {stats?.pendingCourses}
-                      </p>
-                    )}
-                  </div>
-                  <div className="p-3 bg-amber-100 rounded-xl">
-                    <History className="w-6 h-6 text-amber-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+             <Card>
+                <CardHeader><CardTitle className="text-lg flex items-center gap-2"><TrendingUp className="w-5 h-5 text-green-500" /> Top Performing Courses</CardTitle></CardHeader>
+                <CardContent>
+                   <div className="space-y-4">
+                      {topCourses.map(course => (
+                        <div key={course.courseId} className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0">
+                           <div className="flex items-center gap-3">
+                              <img src={getFullUrl(course.courseImage)} className="w-10 h-8 rounded object-cover" />
+                              <p className="text-sm font-bold">{course.title}</p>
+                           </div>
+                           <div className="flex items-center gap-1 text-amber-500">
+                              <Star className="w-3 h-3 fill-amber-500" />
+                              <span className="text-xs font-bold">{course.averageRating.toFixed(1)}</span>
+                           </div>
+                        </div>
+                      ))}
+                   </div>
+                </CardContent>
+             </Card>
           </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Top Performing Courses</CardTitle>
-              <CardDescription>
-                Courses with the highest ratings
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {statsLoading ? (
-                <div className="space-y-4">
-                  <Skeleton className="h-14 w-full" />
-                  <Skeleton className="h-14 w-full" />
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Course</TableHead>
-                      <TableHead>Rating</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {dashboardData?.topCourses?.map((course) => (
-                      <TableRow key={course.courseId}>
-                        <TableCell className="font-medium">{course.title}</TableCell>
-                        <TableCell>
-                           <Badge variant="secondary">{course.averageRating.toFixed(1)} ★</Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="categories">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Category Management</CardTitle>
-                <CardDescription>Organize courses into topics</CardDescription>
-              </div>
-              <Dialog open={isCategoryModalOpen} onOpenChange={setIsCategoryModalOpen}>
-                <DialogTrigger asChild>
-                  <Button onClick={() => {
-                    setEditingCategory(null);
-                    setCategoryData({ name: "", description: "", image: null });
-                  }}>
-                    <Plus className="w-4 h-4 mr-2" /> Add Category
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>{editingCategory ? "Edit" : "Create"} Category</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4 pt-4">
-                    <div className="space-y-2">
-                      <Label>Name</Label>
-                      <Input 
-                        value={categoryData.name} 
-                        onChange={(e) => setCategoryData({ ...categoryData, name: e.target.value })}
-                        placeholder="e.g. Web Development"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Description</Label>
-                      <Textarea 
-                        value={categoryData.description}
-                        onChange={(e) => setCategoryData({ ...categoryData, description: e.target.value })}
-                        placeholder="Brief overview of the category"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Image</Label>
-                      <Input 
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => setCategoryData({ ...categoryData, image: e.target.files[0] })}
-                      />
-                    </div>
-                    <Button 
-                      className="w-full" 
-                      onClick={() => categoryMutation.mutate(categoryData)}
-                      disabled={categoryMutation.isPending}
-                    >
-                      {categoryMutation.isPending ? "Saving..." : "Save Category"}
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </CardHeader>
-            <CardContent>
-              {categoriesLoading ? (
-                <Skeleton className="h-40 w-full" />
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Image</TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {categories.map((cat) => (
-                      <TableRow key={cat.categoryId}>
-                        <TableCell>
-                          <img src={getFullUrl(cat.imgPath)} className="w-10 h-10 rounded-full object-cover" alt="" />
-                        </TableCell>
-                        <TableCell className="font-bold">{cat.categoryName}</TableCell>
-                        <TableCell className="text-muted-foreground">{cat.description}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => {
-                                setEditingCategory(cat);
-                                setCategoryData({ name: cat.categoryName, description: cat.description || "", image: null });
-                                setIsCategoryModalOpen(true);
-                              }}
-                            >
-                              <Pencil className="w-3 h-3" />
-                            </Button>
-                            <Button 
-                              variant="destructive" 
-                              size="sm"
-                              onClick={() => {
-                                if (confirm("Delete this category?")) deleteCategoryMutation.mutate(cat.categoryId);
-                              }}
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="users">
-          <Card>
-            <CardHeader>
-              <CardTitle>User Management</CardTitle>
-              <CardDescription>
-                Display all users and apply role-based access control
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {usersLoading ? (
-                <div className="space-y-4">
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-10 w-full" />
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>User</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Roles</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {users.map((u) => (
-                      <TableRow key={u.userId}>
-                        <TableCell className="font-medium">
-                          {u.fullName}
-                        </TableCell>
-                        <TableCell>{u.email}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-1 flex-wrap">
-                            {u.roles?.map(role => (
-                              <Badge
-                                key={role}
-                                variant={
-                                  role === "Admin"
-                                    ? "destructive"
-                                    : role === "Instructor"
-                                      ? "warning"
-                                      : "secondary"
-                                }
-                              >
-                                {role}
-                              </Badge>
-                            ))}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            {!u.roles?.includes("Admin") && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() =>
-                                  updateRoleMutation.mutate({
-                                    userId: u.userId,
-                                    role: "Admin",
-                                  })
-                                }
-                              >
-                                Make Admin
-                              </Button>
-                            )}
-                            {!u.roles?.includes("Instructor") && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() =>
-                                  updateRoleMutation.mutate({
-                                    userId: u.userId,
-                                    role: "Instructor",
-                                  })
-                                }
-                              >
-                                Make Instructor
-                              </Button>
-                            )}
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => {
-                                if (confirm("Are you sure you want to delete this user?")) {
-                                  deleteUserMutation.mutate(u.userId);
-                                }
-                              }}
-                              disabled={deleteUserMutation.isPending}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
         </TabsContent>
 
         <TabsContent value="courses">
           <Card>
             <CardHeader>
-              <CardTitle>Course Approvals</CardTitle>
-              <CardDescription>
-                Approve or reject courses submitted by instructors
-              </CardDescription>
+              <CardTitle>Course Verification</CardTitle>
+              <CardDescription>Review and approve newly created courses.</CardDescription>
             </CardHeader>
             <CardContent>
-              {coursesLoading ? (
-                <div className="space-y-4">
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-10 w-full" />
-                </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Course</TableHead>
+                    <TableHead>Instructor</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {allCourses.map((course) => (
+                    <TableRow key={course.courseId}>
+                      <TableCell className="font-medium">{course.title}</TableCell>
+                      <TableCell>{course.instructorName}</TableCell>
+                      <TableCell>{course.categoryName}</TableCell>
+                      <TableCell>
+                        <Badge variant={course.isApproved ? "success" : "warning"}>
+                          {course.isApproved ? "Approved" : "Pending"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {!course.isApproved && (
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-green-600"
+                              onClick={() => approveMutation.mutate({ courseId: course.courseId, approve: true })}
+                            >
+                              <CheckCircle className="w-4 h-4 mr-1" /> Approve
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-destructive"
+                              onClick={() => approveMutation.mutate({ courseId: course.courseId, approve: false })}
+                            >
+                              <XCircle className="w-4 h-4 mr-1" /> Reject
+                            </Button>
+                          </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="enrollments">
+          <Card>
+            <CardHeader>
+              <CardTitle>Global Enrollments</CardTitle>
+              <CardDescription>View and manage all student enrollments across the platform.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isEnrollLoading ? (
+                <div className="py-10 text-center"><Loader2 className="animate-spin inline mr-2" /> Loading enrollments...</div>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Enrollment ID</TableHead>
+                      <TableHead>Student</TableHead>
                       <TableHead>Course</TableHead>
-                      <TableHead>Instructor</TableHead>
-                      <TableHead>Price</TableHead>
-                      <TableHead>Actions</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {pendingCourses.map((course) => (
-                      <TableRow key={course.courseId}>
+                    {allEnrollments.map((enrollment) => (
+                      <TableRow key={enrollment.enrollmentId}>
+                        <TableCell className="font-mono text-xs">#{enrollment.enrollmentId}</TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-3">
-                            <img
-                              src={getFullUrl(course.imgPath)}
-                              className="w-10 h-7 rounded object-cover"
-                              alt=""
-                            />
-                            <span className="font-medium">{course.title}</span>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{enrollment.studentName}</span>
+                            <span className="text-[10px] text-muted-foreground">{enrollment.studentId}</span>
                           </div>
                         </TableCell>
-                        <TableCell>
-                          {course.instructorName || "Unknown"}
-                        </TableCell>
-                        <TableCell>${course.price}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="success"
-                              className="gap-1"
-                              onClick={() =>
-                                approveCourseMutation.mutate(course.courseId)
+                        <TableCell>{enrollment.courseTitle}</TableCell>
+                        <TableCell>{new Date(enrollment.enrolledAt).toLocaleDateString()}</TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive hover:bg-destructive/10"
+                            onClick={() => {
+                              if (window.confirm("Are you sure you want to delete this enrollment?")) {
+                                deleteEnrollmentMutation.mutate(enrollment.enrollmentId);
                               }
-                            >
-                              <CheckCircle2 className="w-4 h-4" /> Approve
-                            </Button>
-                          </div>
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
+                    {allEnrollments.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-10 text-muted-foreground italic">
+                          No enrollments found.
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               )}

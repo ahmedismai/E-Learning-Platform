@@ -49,12 +49,12 @@ const Index = () => {
     {
       icon: Users,
       title: "Interactive Learning",
-      description: "Engage with quizzes, assignments, and hands-on projects",
+      description: "Engage with quizzes and hands-on projects",
     },
     {
       icon: Award,
-      title: "Earn Certificates",
-      description: "Get recognized credentials to boost your career",
+      title: "Interactive Quizzes",
+      description: "Test your knowledge with AI-powered assessments",
     },
     {
       icon: Play,

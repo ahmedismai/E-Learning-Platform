@@ -16,34 +16,46 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, XCircle, BookOpen, User, DollarSign, Trash2 } from "lucide-react";
+import {
+  CheckCircle2,
+  XCircle,
+  BookOpen,
+  User,
+  DollarSign,
+  Trash2,
+} from "lucide-react";
 import api from "@/api/axios";
+import courseService from "@/api/course";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const AdminCourses = () => {
   const queryClient = useQueryClient();
 
+  // دالة واحدة موحدة للـ URL
   const getFullUrl = (path) => {
-    if (!path) return "";
+    if (!path || path === "No Image Available") return "/placeholder.svg";
     if (path.startsWith("http")) return path;
     const baseUrl = api.defaults.baseURL.replace("/api", "");
-    return `${baseUrl}/${path.replace(/\\/g, "/")}`;
+    return `${baseUrl}/Images/Course/${path.replace(/\\/g, "/")}`;
   };
 
   const { data: response, isLoading } = useQuery({
     queryKey: ["admin", "courses"],
-    queryFn: async () => {
-      const response = await api.get("/Course/pending");
-      return response.data;
-    },
+    queryFn: () => courseService.getPending(),
   });
 
   const courses = response?.data || [];
 
   const updateCourseStatusMutation = useMutation({
     mutationFn: async ({ courseId, status }) => {
-      return await api.patch(`/Course/${courseId}/approve`, { isApproved: status === "Approved" });
+      return await courseService.approve(courseId, {
+        isApproved: status === "Approved",
+        rejectionReason:
+          status === "Approved"
+            ? ""
+            : "Course content does not meet guidelines",
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["admin", "courses"]);
@@ -53,9 +65,7 @@ const AdminCourses = () => {
   });
 
   const deleteCourseMutation = useMutation({
-    mutationFn: async (courseId) => {
-      return await api.delete(`/Course/${courseId}`);
-    },
+    mutationFn: (courseId) => courseService.delete(courseId),
     onSuccess: () => {
       queryClient.invalidateQueries(["admin", "courses"]);
       toast.success("Course deleted successfully");
@@ -73,119 +83,78 @@ const AdminCourses = () => {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Course Approvals</h1>
-        <p className="text-muted-foreground mt-1">
-          Review and approve new course submissions
-        </p>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BookOpen className="w-5 h-5 text-primary" />
-            Submitted Courses
-          </CardTitle>
-          <CardDescription>
-            {courses.length} courses pending review
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Course</TableHead>
-                <TableHead>Instructor</TableHead>
-                <TableHead>Price</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+    <Card>
+      <CardHeader>
+        <CardTitle>Pending Courses</CardTitle>
+        <CardDescription>Review and manage course submissions</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Course</TableHead>
+              <TableHead>Instructor</TableHead>
+              <TableHead>Price</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {courses.map((course) => (
+              <TableRow key={course.id}>
+                <TableCell className="font-medium">
+                  <div className="flex items-center gap-2">
+                    <img
+                      src={getFullUrl(course.imagePath)}
+                      alt={course.title}
+                      className="w-10 h-10 object-cover rounded"
+                    />
+                    {course.title}
+                  </div>
+                </TableCell>
+                <TableCell>{course.instructorName || "Unknown"}</TableCell>
+                <TableCell>${course.price}</TableCell>
+                <TableCell className="space-x-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-green-600"
+                    onClick={() =>
+                      updateCourseStatusMutation.mutate({
+                        courseId: course.id,
+                        status: "Approved",
+                      })
+                    }
+                  >
+                    <CheckCircle2 className="w-4 h-4 mr-1" /> Approve
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-red-600"
+                    onClick={() =>
+                      updateCourseStatusMutation.mutate({
+                        courseId: course.id,
+                        status: "Rejected",
+                      })
+                    }
+                  >
+                    <XCircle className="w-4 h-4 mr-1" /> Reject
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-gray-500"
+                    onClick={() => deleteCourseMutation.mutate(course.id)}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {courses.map((course) => (
-                <TableRow key={course.courseId}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={getFullUrl(course.imgPath)}
-                        className="w-12 h-8 rounded object-cover border"
-                        alt=""
-                      />
-                      <div>
-                        <span className="font-bold block line-clamp-1">
-                          {course.title}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                          {course.categoryName || "General"}
-                        </span>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <User className="w-3 h-3 text-muted-foreground" />
-                      {course.instructorName || "Unknown"}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center font-bold text-primary">
-                      <DollarSign className="w-3 h-3" />
-                      {course.price}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="warning">Pending</Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        size="sm"
-                        variant="success"
-                        onClick={() =>
-                          updateCourseStatusMutation.mutate({
-                            courseId: course.courseId,
-                            status: "Approved",
-                          })
-                        }
-                        className="h-8 gap-1"
-                      >
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Approve
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() =>
-                          updateCourseStatusMutation.mutate({
-                            courseId: course.courseId,
-                            status: "Rejected",
-                          })
-                        }
-                        className="h-8 gap-1"
-                      >
-                        <XCircle className="w-3.5 h-3.5" /> Reject
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => {
-                          if (window.confirm("Are you sure you want to delete this course? This action cannot be undone.")) {
-                            deleteCourseMutation.mutate(course.courseId);
-                          }
-                        }}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-    </div>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
   );
 };
 

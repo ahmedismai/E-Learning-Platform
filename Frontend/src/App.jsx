@@ -21,10 +21,11 @@ import MainLayout from "./components/MainLayout";
 import MyCourses from "./pages/MyCourses";
 import CreateCourse from "./pages/CreateCourse";
 import CreateExam from "./pages/CreateExam";
-import Certificates from "./pages/Certificates";
 import Grades from "./pages/Grades";
 import Exams from "./pages/Exams";
 import ConfirmEmail from "./pages/ConfirmEmail";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import QuizPage from "./pages/QuizPage";
 import Chatbot from "./components/Chatbot";
@@ -33,17 +34,14 @@ import AdminOverview from "./pages/admin/AdminOverview";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminCourses from "./pages/admin/AdminCourses";
-import AdminCertificates from "./pages/admin/AdminCertificates";
 import AdminCategories from "./pages/admin/AdminCategories";
 import AdminPayments from "./pages/admin/AdminPayments";
+import MyOrders from "./pages/MyOrders";
 import Settings from "./pages/Settings";
 import StudentManagement from "./pages/instructor/StudentManagement";
 import InstructorSubmissions from "./pages/instructor/InstructorSubmissions";
-import InstructorCertificates from "./pages/instructor/InstructorCertificates";
 import StudentResults from "./pages/instructor/StudentResults"; // New import
 import RoleBasedDashboard from "./components/RoleBasedDashboard";
-import RoleBasedAssignments from "./pages/RoleBasedAssignments";
-import RoleBasedQuizzes from "./pages/RoleBasedQuizzes";
 import SmartAssessments from "./pages/SmartAssessments";
 
 const queryClient = new QueryClient();
@@ -63,7 +61,6 @@ const ProtectedRoute = () => {
   if (!user) {
     return <Navigate to="/login" replace />;
   }
-
   if (!user.emailConfirmed) {
     return <Navigate to="/confirm-email" replace />;
   }
@@ -95,7 +92,7 @@ const App = () => (
           <Routes>
             {/* --- الصفحات المتاحة للجميع (Public) --- */}
             <Route path="/" element={<Index />} />
-            
+
             <Route element={<MainLayout />}>
               <Route path="/browse-courses" element={<BrowseCourses />} />
               <Route path="/courses" element={<BrowseCourses />} />
@@ -108,6 +105,8 @@ const App = () => (
             <Route element={<PublicRoute />}>
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
             </Route>
 
             {/* --- الصفحات المحمية (Protected - Require Login) --- */}
@@ -121,24 +120,33 @@ const App = () => (
                 <Route path="create-course" element={<CreateCourse />} />
                 <Route path="courses/:id" element={<CourseDetails />} />
                 <Route path="edit-course/:id" element={<CreateCourse />} />
-                <Route path="certificates" element={<Certificates />} />
                 <Route path="grades" element={<Grades />} />
-                <Route path="assignments" element={<RoleBasedAssignments />} />
-                <Route path="quizzes" element={<RoleBasedQuizzes />} />
+                <Route
+                  path="smart-assessments"
+                  element={<SmartAssessments />}
+                />
                 <Route path="exams" element={<Exams />} />
                 <Route path="exam/:id" element={<QuizPage />} />
                 <Route path="students" element={<StudentManagement />} />
                 <Route path="student-results" element={<StudentResults />} />
-                <Route path="student-results/:id" element={<StudentResults />} />
-                <Route path="instructor-certificates" element={<InstructorCertificates />} />
-                <Route path="review-submissions" element={<InstructorSubmissions />} />
-                <Route path="review-submissions/:id" element={<InstructorSubmissions />} />
+                <Route
+                  path="student-results/:id"
+                  element={<StudentResults />}
+                />
+                <Route
+                  path="review-submissions"
+                  element={<InstructorSubmissions />}
+                />
+                <Route
+                  path="review-submissions/:id"
+                  element={<InstructorSubmissions />}
+                />
                 <Route path="users" element={<AdminUsers />} />
                 <Route path="admin-courses" element={<AdminCourses />} />
-                <Route path="admin-certificates" element={<AdminCertificates />} />
                 <Route path="reports" element={<AdminOverview />} />
                 <Route path="admin" element={<AdminDashboard />} />
                 <Route path="payments" element={<AdminPayments />} />
+                <Route path="my-orders" element={<MyOrders />} />
                 <Route path="categories" element={<AdminCategories />} />
                 <Route path="create-exam" element={<CreateExam />} />
                 <Route path="settings" element={<Settings />} />

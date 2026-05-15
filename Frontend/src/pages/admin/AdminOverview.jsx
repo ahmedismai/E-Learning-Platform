@@ -18,12 +18,13 @@ import {
 } from "lucide-react";
 import api from "@/api/axios";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getFullUrl } from "@/lib/urlHelper";
 
 const AdminOverview = () => {
   const { data: response, isLoading } = useQuery({
     queryKey: ["admin", "stats"],
     queryFn: async () => {
-      const response = await api.get("/Dashboard/AdminDashboard");
+      const response = await api.get("/Dashboards/AdminDashboard");
       return response.data;
     },
   });
@@ -110,98 +111,75 @@ const AdminOverview = () => {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-primary" />
-              System Performance
+              <Users className="w-5 h-5 text-primary" />
+              Recent Active Users
             </CardTitle>
             <CardDescription>
-              Real-time server and memory metrics
+              Last student activity on the platform
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex justify-between items-center p-4 border rounded-xl bg-muted/30">
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
-                <span className="font-medium text-muted-foreground text-sm uppercase tracking-wider">
-                  Server Uptime
-                </span>
-              </div>
-              <span className="font-mono font-bold">
-                {Math.floor(stats?.systemHealth?.uptime / 3600)}h{" "}
-                {Math.floor((stats?.systemHealth?.uptime % 3600) / 60)}m
-              </span>
-            </div>
-            <div className="flex justify-between items-center p-4 border rounded-xl bg-muted/30">
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 rounded-full bg-blue-500" />
-                <span className="font-medium text-muted-foreground text-sm uppercase tracking-wider">
-                  Memory Usage
-                </span>
-              </div>
-              <span className="font-mono font-bold">
-                {Math.round(
-                  stats?.systemHealth?.memoryUsage?.rss / 1024 / 1024,
-                )}{" "}
-                MB
-              </span>
-            </div>
-            <div className="flex justify-between items-center p-4 border rounded-xl bg-muted/30">
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 rounded-full bg-warning" />
-                <span className="font-medium text-muted-foreground text-sm uppercase tracking-wider">
-                  Active Threads
-                </span>
-              </div>
-              <span className="font-mono font-bold">
-                {stats?.systemHealth?.activeThreads || 4}
-              </span>
+          <CardContent>
+            <div className="space-y-4">
+              {response?.recentActiveUsers?.map((user) => (
+                <div key={user.id} className="flex items-center justify-between p-3 border rounded-xl hover:bg-muted/50 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-bold">
+                      {user.fullName?.[0] || "U"}
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold">{user.fullName}</p>
+                      <p className="text-[10px] text-muted-foreground">{user.email}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-bold uppercase text-muted-foreground">Last Activity</p>
+                    <p className="text-xs">{new Date(user.lastActivity).toLocaleDateString()}</p>
+                  </div>
+                </div>
+              ))}
+              {!response?.recentActiveUsers?.length && (
+                 <p className="text-sm text-muted-foreground italic text-center py-4">No recent activity.</p>
+              )}
             </div>
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-1">
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-primary" />
-              Recent Milestones
+              <TrendingUp className="w-5 h-5 text-primary" />
+              Top Rated Courses
             </CardTitle>
+            <CardDescription>
+              Highest performing content by rating
+            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            {[
-              {
-                label: "New Instructors",
-                val: stats?.totalInstructors,
-                desc: "Subject experts onboarded",
-              },
-              {
-                label: "Course Listings",
-                val: stats?.totalCourses,
-                desc: "Quality educational content",
-              },
-              {
-                label: "Total Students",
-                val: stats?.totalStudents,
-                desc: "Active learners on platform",
-              },
-            ].map((item, i) => (
-              <div key={i} className="flex items-center justify-between group">
-                <div>
-                  <p className="font-bold text-foreground group-hover:text-primary transition-colors">
-                    {item.label}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{item.desc}</p>
-                </div>
-                <Badge
-                  variant="secondary"
-                  className="text-sm px-3 py-1 font-bold"
-                >
-                  {item.val}
-                </Badge>
-              </div>
-            ))}
+          <CardContent>
+            <div className="space-y-4">
+               {response?.topCourses?.map((course) => (
+                 <div key={course.courseId} className="flex items-center gap-4 p-2 border rounded-xl">
+                   <img 
+                     src={getFullUrl(course.courseImage)} 
+                     alt={course.title}
+                     className="w-12 h-12 rounded-lg object-cover"
+                   />
+                   <div className="flex-1 min-w-0">
+                     <p className="text-sm font-bold truncate">{course.title}</p>
+                     <div className="flex items-center gap-1 text-xs text-amber-500">
+                        <TrendingUp className="w-3 h-3" />
+                        <span>{course.averageRating.toFixed(1)} Rating</span>
+                     </div>
+                   </div>
+                 </div>
+               ))}
+               {!response?.topCourses?.length && (
+                 <p className="text-sm text-muted-foreground italic text-center py-4">No top courses yet.</p>
+               )}
+            </div>
           </CardContent>
         </Card>
       </div>

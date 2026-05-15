@@ -1,182 +1,203 @@
-import { useQuery } from "@tanstack/react-query";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import api from "@/api/axios";
-import { Link } from "react-router-dom";
-import { BookOpen, Search, User, PlayCircle } from "lucide-react";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
+import api from "@/api/axios";
+import courseService from "@/api/course";
+import { enrollmentService } from "@/api/enrollment";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Search, Filter, BookOpen, Users, Star, Play, Loader2 } from "lucide-react";
+import { Link } from "react-router-dom";
+import { getFullUrl } from "@/lib/urlHelper";
 
 const BrowseCourses = () => {
   const { user } = useAuth();
-  const [search, setSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null);
 
-  const { data: courses = [], isLoading } = useQuery({
-    queryKey: ["courses"],
-    queryFn: async () => {
-      const response = await api.get("/Course");
-      return response.data.data || []; // Handle ServiceResponse<T>
-    },
-  });
-
-  const { data: categories = [] } = useQuery({
+  const { data: categoriesResponse, isLoading: isCategoriesLoading } = useQuery({
     queryKey: ["categories"],
     queryFn: async () => {
-      const response = await api.get("/Category");
-      return response.data.data || []; // Handle ServiceResponse<T>
+      const response = await api.get("/Category/List");
+      return response.data;
     },
   });
 
-  // Enrollment Logic for Smart Navigation
-  const { data: enrollments = [] } = useQuery({
-    queryKey: ["enrollments", "me"],
+  const { data: coursesResponse, isLoading: isCoursesLoading } = useQuery({
+    queryKey: ["courses", searchTerm, selectedCategoryId],
     queryFn: async () => {
-      // Assuming a "MyCourses" or specific enrollment endpoint for the current user
-      const response = await api.get(`/Enrollment/ByStudent/${user.id}`);
-      return response.data.data || [];
+      let response;
+      if (!selectedCategoryId) {
+        response = await courseService.getAll({ name: searchTerm, pageSize: 100 });
+      } else {
+        response = await courseService.getByCategory(selectedCategoryId);
+      }
+      return response;
     },
-    enabled: !!user && user?.role === "Student",
   });
+
+  const { data: enrollmentsResponse = { data: [] } } = useQuery({
+    queryKey: ["enrollments", user?.id],
+    queryFn: async () => {
+      try {
+        const response = await enrollmentService.getByStudent(user.id);
+        return response;
+      } catch (error) {
+        if (error.response?.status === 404) {
+          return { success: true, data: [] };
+        }
+        throw error;
+      }
+    },
+    enabled: !!user && (user?.role === "Student" || user?.role === "Admin"),
+  });
+
+  const enrollments = enrollmentsResponse.data || [];
 
   const isEnrolled = (courseId) => {
-    return enrollments.some(
-      (e) => e.courseId === courseId
-    );
+    return enrollments.some((e) => e.courseId === courseId);
   };
 
-  const filteredCourses = courses.filter((course) => {
-    const matchesSearch =
-      course.title.toLowerCase().includes(search.toLowerCase()) ||
-      course.categoryName?.toLowerCase().includes(search.toLowerCase());
+  const categories = categoriesResponse?.data || [];
+  const courses = coursesResponse?.data?.data || coursesResponse?.data || [];
 
-    const matchesCategory =
-      selectedCategory === "All" ||
-      course.categoryName === selectedCategory;
+  const getFullUrl = (path) => {
+    if (!path) return "/placeholder.svg";
+    if (path.startsWith("http")) return path;
+    const baseUrl = api.defaults.baseURL.replace("/api", "");
+    return `${baseUrl}/Images/Course/${path.replace(/\\/g, "/")}`;
+  };
 
-    return matchesSearch && matchesCategory;
-  });
+  if (isCoursesLoading || isCategoriesLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-10 animate-fade-in max-w-7xl mx-auto">
-      <div className="bg-white p-8 rounded-3xl shadow-soft border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-8">
-        <div>
-          <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">
-            Explore <span className="text-teal-600">Courses</span>
-          </h1>
-          <p className="text-slate-500 mt-2 text-lg font-medium">
-            Master new skills with our expert-led programs
-          </p>
-        </div>
-        <div className="relative w-full md:w-[400px] group">
-          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-            <Search className="w-5 h-5 text-slate-400 group-focus-within:text-teal-600 transition-colors" />
-          </div>
+    <div className="space-y-8 animate-fade-in pb-12">
+      <div className="bg-primary/5 p-8 rounded-3xl border border-primary/10">
+        <h1 className="text-4xl font-bold text-foreground mb-4">Discover Your Next Skill</h1>
+        <p className="text-muted-foreground text-lg max-w-2xl">
+          Browse through our extensive catalog of professional courses led by industry experts.
+        </p>
+      </div>
+
+      <div className="flex flex-col md:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
           <Input
-            placeholder="Search courses, instructors..."
-            className="pl-12 h-14 bg-slate-50 border-none rounded-2xl text-base focus-visible:ring-2 focus-visible:ring-teal-600/20 shadow-inner"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search for courses, topics, or instructors..."
+            className="pl-10 h-12 rounded-xl"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-      </div>
-
-      {/* Category Pills */}
-      <div className="flex flex-wrap gap-2">
-        <Button
-          variant={selectedCategory === "All" ? "default" : "outline"}
-          size="sm"
-          onClick={() => setSelectedCategory("All")}
-          className="rounded-full px-6"
-        >
-          All Courses
-        </Button>
-        {categories.map((cat) => (
+        <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0">
           <Button
-            key={cat.categoryId}
-            variant={selectedCategory === cat.categoryName ? "default" : "outline"}
-            size="sm"
-            onClick={() => setSelectedCategory(cat.categoryName)}
-            className="rounded-full px-6"
+            variant={selectedCategoryId === null ? "default" : "outline"}
+            className="rounded-xl h-12"
+            onClick={() => setSelectedCategoryId(null)}
           >
-            {cat.categoryName}
+            All Courses
           </Button>
-        ))}
-      </div>
-
-      {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1, 2, 3].map((i) => (
-            <Card key={i} className="h-96 animate-pulse bg-accent/5" />
+          {categories.map((cat) => (
+            <Button
+              key={cat.categoryId}
+              variant={selectedCategoryId === cat.categoryId ? "default" : "outline"}
+              className="rounded-xl h-12 whitespace-nowrap"
+              onClick={() => setSelectedCategoryId(cat.categoryId)}
+            >
+              {cat.categoryName}
+            </Button>
           ))}
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {filteredCourses.map((course) => (
-            <Card
-              key={course.courseId}
-              className="overflow-hidden group hover:shadow-2xl transition-all duration-500 border-none bg-white"
-            >
-              <div className="aspect-video relative overflow-hidden">
-                {course.imgPath ? (
-                  <img
-                    src={`${api.defaults.baseURL.replace('/api', '')}/${course.imgPath.replace(/\\/g, '/')}`}
-                    alt={course.title}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-slate-100">
-                    <BookOpen className="w-12 h-12 text-slate-300" />
-                  </div>
-                )}
-                <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors duration-500" />
-                <Badge className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm text-slate-900 border-none shadow-sm hover:bg-white">
-                  {course.categoryName || "General"}
-                </Badge>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {courses.map((course) => (
+          <Card key={course.courseId} className="group overflow-hidden hover:shadow-2xl transition-all duration-500 border-none bg-white">
+            <div className="relative aspect-video overflow-hidden">
+              <img
+                src={getFullUrl(course.imgPath)}
+                alt={course.title}
+                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+              />
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-500" />
+              <Badge className="absolute top-3 right-3 bg-white/90 text-primary border-none shadow-sm backdrop-blur-sm">
+                {course.categoryName}
+              </Badge>
+            </div>
+            <CardHeader className="p-5 pb-2">
+              <div className="flex items-center gap-1 text-amber-500 mb-2">
+                <Star className="w-3.5 h-3.5 fill-current" />
+                <Star className="w-3.5 h-3.5 fill-current" />
+                <Star className="w-3.5 h-3.5 fill-current" />
+                <Star className="w-3.5 h-3.5 fill-current" />
+                <Star className="w-3.5 h-3.5 fill-current opacity-50" />
+                <span className="text-xs font-bold text-slate-400 ml-1">(4.0)</span>
               </div>
-              <CardHeader className="p-6">
-                <CardTitle className="text-xl font-bold line-clamp-1 group-hover:text-primary transition-colors duration-300">
-                  {course.title}
-                </CardTitle>
-                <div className="flex items-center gap-2 text-sm text-slate-500 mt-2 font-medium">
-                  <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
-                    <User className="w-3 h-3 text-primary" />
-                  </div>
-                  <span>{course.instructorName || "Instructor"}</span>
+              <CardTitle className="text-lg font-bold group-hover:text-primary transition-colors line-clamp-2 min-h-[3.5rem]">
+                {course.title}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-5 pt-0">
+              <p className="text-sm text-slate-500 mb-4 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                {course.instructorName}
+              </p>
+              
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Price</span>
+                  <span className="text-xl font-black text-slate-900">
+                    {course.price === 0 ? (
+                      <span className="text-green-500">Free</span>
+                    ) : (
+                      `$${course.price}`
+                    )}
+                  </span>
                 </div>
-              </CardHeader>
-              <CardContent className="px-6 py-0">
-                <p className="text-slate-600 text-sm line-clamp-2 leading-relaxed">
-                  {course.description}
-                </p>
-              </CardContent>
-              <CardFooter className="p-6 flex items-center justify-between border-t border-slate-50 mt-4">
-                <span className="text-2xl font-bold text-primary">
-                  ${course.price}
-                </span>
-                {isEnrolled(course.courseId) ? (
-                  <Button asChild variant="secondary" className="gap-2 rounded-full px-6">
+                <div className="flex items-center gap-1 text-slate-400">
+                   <Users className="w-4 h-4" />
+                   <span className="text-xs font-bold">{course.enrolledCount || 0}</span>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                {user?.role === "Instructor" && course.instructorId === user.id ? (
+                  <Button asChild variant="outline" className="w-full rounded-xl font-bold border-primary/20 hover:bg-primary/5">
                     <Link to={`/dashboard/courses/${course.courseId}`}>
-                      <PlayCircle className="w-4 h-4" />
+                      Manage Course
+                    </Link>
+                  </Button>
+                ) : isEnrolled(course.courseId) ? (
+                  <Button asChild className="w-full rounded-xl font-bold shadow-glow hover:shadow-none bg-green-500 hover:bg-green-600">
+                    <Link to={`/dashboard/courses/${course.courseId}`} className="flex items-center justify-center gap-2">
+                      <Play className="w-4 h-4 fill-current" />
                       Continue
                     </Link>
                   </Button>
                 ) : (
-                  <Button asChild className="rounded-full px-6 shadow-glow hover:shadow-none transition-all">
+                  <Button asChild className="w-full rounded-xl font-bold shadow-glow hover:shadow-none">
                     <Link to={`/courses/${course.courseId}`}>View Details</Link>
                   </Button>
                 )}
-              </CardFooter>
-            </Card>
-          ))}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {courses.length === 0 && (
+        <div className="text-center py-20 bg-muted/30 rounded-3xl border-2 border-dashed">
+          <BookOpen className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+          <h3 className="text-xl font-bold text-foreground">No courses found</h3>
+          <p className="text-muted-foreground">Try adjusting your search or filters.</p>
         </div>
       )}
     </div>

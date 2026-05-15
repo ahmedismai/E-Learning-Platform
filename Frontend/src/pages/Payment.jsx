@@ -23,6 +23,8 @@ import {
   Shield,
 } from "lucide-react";
 import api from "@/api/axios";
+import enrollmentService from "@/api/enrollment";
+import orderService from "@/api/order";
 
 const Payment = () => {
   const { courseId } = useParams();
@@ -87,18 +89,33 @@ const Payment = () => {
     setIsProcessing(true);
     try {
       await new Promise((resolve) => setTimeout(resolve, 1000));
-      await api.post("/Enrollment", { courseId: course.id });
-      toast({
-        title: "Payment Successful!",
-        description: `You are now enrolled in ${course.title}`,
-      });
-      navigate("/dashboard/my-courses");
+      
+      if (course.isFree) {
+        await enrollmentService.create({ 
+          courseId: course.id,
+          studentId: user.id 
+        });
+        toast({
+          title: "Enrolled Successfully!",
+          description: `You are now enrolled in ${course.title}`,
+        });
+        navigate("/dashboard/my-courses");
+      } else {
+        await orderService.create({ 
+          courseId: course.id
+        });
+        toast({
+          title: "Order Submitted!",
+          description: "Your request has been sent for admin approval. You will gain access once verified.",
+        });
+        navigate("/dashboard/my-courses");
+      }
     } catch (error) {
       toast({
-        title: "Enrollment failed",
+        title: "Transaction failed",
         description:
           error.response?.data?.message ||
-          "Unable to complete enrollment right now.",
+          "Unable to complete the request right now.",
         variant: "destructive",
       });
     } finally {

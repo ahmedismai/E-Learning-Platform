@@ -27,6 +27,8 @@ import { toast } from "sonner";
 import AIFeedback from "@/components/AIFeedback";
 import { Badge } from "@/components/ui/badge";
 
+import examService from "@/api/exam";
+
 const QuizPage = () => {
   const { id } = useParams();
   const location = useLocation();
@@ -47,35 +49,23 @@ const QuizPage = () => {
   const { user } = useAuth();
   const isInstructor = user?.role === "Instructor";
   const isAiPractice = id === "ai-practice";
+  const isPracticeType = type === "practice";
   const aiData = location.state?.quizData;
 
   // Pre-fetch Guard: Check for prior submission
   useEffect(() => {
     const verifyAccess = async () => {
-      if (isInstructor || isAiPractice) {
+      if (isInstructor || isAiPractice || isPracticeType) {
         setIsVerifying(false);
         return;
       }
-
-      try {
-        const endpoint = type === "exam" ? `/Exam/${id}` : `/Quiz/${id}`;
-        await api.get(endpoint);
-        setIsVerifying(false);
-      } catch (error) {
-        if (error.response?.status === 403) {
-          toast.error("You have already completed this assessment");
-          setHasSubmitted(true);
-          navigate("/dashboard", { replace: true });
-        } else {
-          setIsVerifying(false);
-        }
-      }
+      setIsVerifying(false);
     };
 
     verifyAccess();
-  }, [id, type, isInstructor, isAiPractice, navigate]);
+  }, [id, type, isInstructor, isAiPractice, isPracticeType, navigate]);
 
-  // 1. Fetch Quiz/Exam Data
+  // 1. Fetch Exam Data
   const {
     data: fetchedData,
     isLoading,
@@ -84,45 +74,38 @@ const QuizPage = () => {
   } = useQuery({
     queryKey: ["assessment", type, id],
     queryFn: async () => {
-      if (isAiPractice) return aiData;
-      const endpoint = type === "exam" ? `/Exam/${id}` : `/Quiz/${id}`;
-      const response = await api.get(endpoint);
-      return response.data;
+      if (isAiPractice && aiData) return { data: aiData };
+      
+      // Backend: Student starts exam via POST StartExam, Instructor views Details via GET
+      if (isInstructor) {
+        return examService.getDetails(id);
+      } else {
+        return examService.startExam(id);
+      }
     },
     enabled: (!isAiPractice || !!aiData) && !isVerifying && !hasSubmitted,
     retry: 1,
   });
 
-  // Navigation Guard for already completed assessments
+  // Navigation Guard
   useEffect(() => {
-    if (fetchError?.response?.status === 403) {
-      toast.error("You have already completed this assessment");
+    if (fetchError?.response?.status === 400) {
+      toast.error(fetchError.response?.data?.message || "Assessment unavailable");
       navigate("/dashboard", { replace: true });
     }
   }, [fetchError, navigate]);
 
-  // Fetch grade record once we have a gradeId to get isReviewed status
-  const { data: gradeDetails } = useQuery({
-    queryKey: ["grade", gradeId],
-    queryFn: async () => {
-      // We don't have a single grade endpoint, but we can filter from /me
-      const res = await api.get("/Grade/me");
-      return res.data.find((g) => g._id === gradeId);
-    },
-    enabled: !!gradeId,
-  });
-
-  const quizData = isAiPractice ? aiData : fetchedData;
+  const quizData = fetchedData?.data;
 
   // 2. Set initial timer
   useEffect(() => {
-    if ((quizData?.duration || isAiPractice) && !isInstructor) {
-      const mins = parseInt(quizData?.duration) || 15;
+    if (quizData && !isInstructor) {
+      const mins = quizData.durationInMinutes || 15;
       setTimeLeft(mins * 60);
     }
-  }, [quizData, isAiPractice, isInstructor]);
+  }, [quizData, isInstructor]);
 
-  // Handle case where AI Practice data is lost (e.g. refresh)
+  // Handle case where AI Practice data is lost (e.g. refresh if it was passed via state)
   if (isAiPractice && !aiData && !isLoading) {
     return (
       <div className="max-w-2xl mx-auto mt-12 text-center space-y-6">
@@ -148,50 +131,10 @@ const QuizPage = () => {
     mutationFn: async (payload) => {
       if (isInstructor)
         return { message: "Instructor preview - no data saved" };
-      // Handle AI Practice locally
-      if (isAiPractice) {
-        let correct = 0;
-        const questions = quizData?.questions || [];
-        payload.answers.forEach((ans, idx) => {
-          const originalQuestion = questions[idx];
-          if (ans.answer === originalQuestion?.correctAnswer) {
-            correct++;
-          }
-        });
-
-        const score = Math.round((correct / questions.length) * 100);
-
-        // Return a mock response that matches the expected structure
-        return {
-          success: true,
-          score,
-          correctCount: correct,
-          totalQuestions: questions.length,
-          passed: score >= 70,
-          isAiPractice: true,
-        };
-      }
-
-      // Use the new Exam-Lifecycle for Exams
-      if (type === "exam") {
-        const lifecyclePayload = {
-          examId: id,
-          selectedAnswers: payload.answers.map((a) => ({
-            questionId: a.questionId,
-            answer: a.answer,
-          })),
-        };
-        const response = await api.post(
-          "/Exam-Lifecycle/submit",
-          lifecyclePayload,
-        );
-        return response.data;
-      }
-
-      // Keep old logic for regular Quizzes
-      const endpoint = `/Quiz/${id}/submit`;
-      const response = await api.post(endpoint, payload);
-      return response.data;
+      
+      // All exams (including AI practice) are now saved to the backend
+      // Backend expects SubmitExamDTO: { ExamId, StartedAt, Answers: [{ QuestionId, AnswerOptionId }] }
+      return examService.submitResult(payload);
     },
     onSuccess: (data) => {
       if (isInstructor) {
@@ -200,17 +143,13 @@ const QuizPage = () => {
         return;
       }
 
-      setScore(data.score || data.grade?.percentage);
-      setGradeId(data.gradeId || data.grade?._id);
+      setScore(data.data?.score || 0);
       setShowResults(true);
       setIsFinished(true);
 
-      if (!isAiPractice) {
-        toast.success(
-          `${type.charAt(0).toUpperCase() + type.slice(1)} submitted and graded!`,
-        );
-        queryClient.invalidateQueries(["enrollments", "me"]);
-        queryClient.invalidateQueries(["grades", "me"]);
+      if (!isAiPractice && !isPracticeType) {
+        toast.success("Exam submitted successfully!");
+        queryClient.invalidateQueries(["student-dashboard"]);
       }
     },
     onError: (error) => {
@@ -218,10 +157,9 @@ const QuizPage = () => {
     },
   });
 
-  const handleAnswerChange = (qId, value) => {
+  const handleAnswerChange = (qId, optionId) => {
     if (isFinished) return;
-    const stringId = String(qId);
-    setAnswers((prev) => ({ ...prev, [stringId]: value }));
+    setAnswers((prev) => ({ ...prev, [qId]: optionId }));
   };
 
   const handleSubmit = () => {
@@ -234,26 +172,19 @@ const QuizPage = () => {
     }
 
     const questions = quizData?.questions || [];
-    const payloadAnswers = questions.map((q, idx) => {
-      const qId = String(q._id || idx);
-      const studentAnswer = answers[qId] || "";
+    const payloadAnswers = questions.map((q) => {
+      const selectedOptionId = answers[q.questionId];
       return {
-        questionId: qId,
-        answer: String(studentAnswer).trim(),
+        questionId: q.questionId,
+        answerOptionId: selectedOptionId ? parseInt(selectedOptionId) : null,
       };
     });
 
-    console.log('Final Submission Payload:', payloadAnswers);
-
-    const payload = { answers: payloadAnswers };
-
-    if (!isAiPractice) {
-      if (type === "exam") {
-        payload.examId = id;
-      } else {
-        payload.quizId = id;
-      }
-    }
+    const payload = { 
+      examId: parseInt(id),
+      startedAt: new Date().toISOString(),
+      answers: payloadAnswers 
+    };
 
     submitMutation.mutate(payload);
   };
@@ -312,7 +243,7 @@ const QuizPage = () => {
     );
   }
 
-  if (showResults && (isAiPractice || type === "exam" || type === "quiz")) {
+  if (showResults && (isAiPractice || isPracticeType || type === "exam" || type === "quiz")) {
     return (
       <div className="max-w-3xl mx-auto mt-12 text-center space-y-8 p-8 bg-card rounded-2xl shadow-xl border border-primary/20 animate-in fade-in zoom-in duration-500">
         <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mx-auto text-primary shadow-inner">
@@ -320,7 +251,7 @@ const QuizPage = () => {
         </div>
         <div className="space-y-4">
           <h2 className="text-3xl font-black tracking-tight">
-            {isAiPractice ? "Practice Completed!" : "Exam Completed!"}
+            {isAiPractice || isPracticeType ? "Practice Completed!" : "Exam Completed!"}
           </h2>
           <div className="flex justify-center gap-4">
             <div className="p-6 bg-muted/50 rounded-2xl border">
@@ -425,7 +356,7 @@ const QuizPage = () => {
 
       <div className="px-4 space-y-8">
         {questions.map((q, idx) => {
-          const qId = String(q._id || idx);
+          const qId = q.questionId;
           return (
             <Card
               key={qId}
@@ -437,28 +368,28 @@ const QuizPage = () => {
                     {idx + 1}
                   </span>
                   <p className="text-lg font-semibold leading-relaxed pt-0.5">
-                    {q.text || q.question}
+                    {q.questionText}
                   </p>
                 </div>
               </CardHeader>
               <CardContent className="p-8">
                 <RadioGroup
-                  value={answers[qId] || ""}
+                  value={String(answers[qId] || "")}
                   onValueChange={(val) => handleAnswerChange(qId, val)}
                   className="grid grid-cols-1 sm:grid-cols-2 gap-4"
                 >
-                  {q.options?.map((opt, optIdx) => (
+                  {q.options?.map((opt) => (
                     <div
-                      key={optIdx}
-                      className={`flex items-center space-x-3 p-4 rounded-xl border-2 transition-all cursor-pointer ${answers[qId] === opt ? "bg-primary/5 border-primary shadow-sm ring-1 ring-primary/20" : "hover:bg-muted/50 border-transparent bg-muted/20"}`}
-                      onClick={() => handleAnswerChange(qId, opt)}
+                      key={opt.answerOptionId}
+                      className={`flex items-center space-x-3 p-4 rounded-xl border-2 transition-all cursor-pointer ${String(answers[qId]) === String(opt.answerOptionId) ? "bg-primary/5 border-primary shadow-sm ring-1 ring-primary/20" : "hover:bg-muted/50 border-transparent bg-muted/20"}`}
+                      onClick={() => handleAnswerChange(qId, opt.answerOptionId)}
                     >
-                      <RadioGroupItem value={opt} id={`q-${idx}-o-${optIdx}`} />
+                      <RadioGroupItem value={String(opt.answerOptionId)} id={`q-${qId}-o-${opt.answerOptionId}`} />
                       <Label
-                        htmlFor={`q-${idx}-o-${optIdx}`}
+                        htmlFor={`q-${qId}-o-${opt.answerOptionId}`}
                         className="flex-1 cursor-pointer text-base font-medium"
                       >
-                        {opt}
+                        {opt.optionText}
                       </Label>
                     </div>
                   ))}

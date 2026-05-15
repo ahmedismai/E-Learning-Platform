@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import api from "@/api/axios";
+import chatbotService from "@/api/chatbot";
 
 const Chatbot = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -33,13 +33,11 @@ const Chatbot = () => {
     setIsLoading(true);
 
     try {
-      const response = await api.post("/Chatbot", { 
-        question: input
-      });
+      const data = await chatbotService.ask(input);
 
       setMessages((prev) => [
         ...prev,
-        { role: "bot", content: response.data.answer },
+        { role: "bot", content: data.answer },
       ]);
     } catch (error) {
       setMessages((prev) => [

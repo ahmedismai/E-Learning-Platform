@@ -57,7 +57,6 @@ const DashboardSidebar = () => {
     { title: "Courses", url: "/dashboard/admin-courses", icon: BookOpen },
     { title: "Categories", url: "/dashboard/categories", icon: Layers },
     { title: "Payments", url: "/dashboard/payments", icon: CreditCard },
-    { title: "Certificates", url: "/dashboard/admin-certificates", icon: Award },
   ];
 
   const instructorLinks = [
@@ -73,16 +72,9 @@ const DashboardSidebar = () => {
       url: "/dashboard/create-exam",
       icon: GraduationCap,
     },
-    {
-      title: "Assignments",
-      url: "/dashboard/assignments",
-      icon: ClipboardList,
-    },
-    { title: "Quizzes", url: "/dashboard/quizzes", icon: FileText },
-    { title: "Exams", url: "/dashboard/exams", icon: GraduationCap },
+    { title: "Manage Exams", url: "/dashboard/exams", icon: ClipboardList },
     { title: "Students", url: "/dashboard/students", icon: Users },
     { title: "Student Results", url: "/dashboard/student-results", icon: BarChart3 },
-    { title: "Certificates", url: "/dashboard/instructor-certificates", icon: Award },
   ];
 
   const studentLinks = [
@@ -90,18 +82,18 @@ const DashboardSidebar = () => {
     { title: "My Courses", url: "/dashboard/my-courses", icon: BookOpen },
     { title: "Browse Courses", url: "/browse-courses", icon: GraduationCap },
     {
-      title: "Smart Assessments",
-      url: "/dashboard/quizzes",
+      title: "Assessments",
+      url: "/dashboard/smart-assessments",
       icon: BrainCircuit,
     },
     { title: "Grades", url: "/dashboard/grades", icon: BarChart3 },
-    { title: "Certificates", url: "/dashboard/certificates", icon: Award },
+    { title: "My Orders", url: "/dashboard/my-orders", icon: CreditCard },
   ];
 
   const getLinks = () => {
     if (!user) return guestLinks;
     switch (user.role) {
-      case "Administrator":
+      case "Admin":
         return adminLinks;
       case "Instructor":
         return instructorLinks;

@@ -9,7 +9,7 @@ const RoleBasedDashboard = () => {
   if (!user) return null;
 
   switch (user.role) {
-    case "Administrator":
+    case "Admin":
       return <AdminOverview />;
     case "Instructor":
       return <InstructorOverview />;

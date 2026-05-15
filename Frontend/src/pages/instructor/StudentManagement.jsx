@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import api from "@/api/axios";
+import courseService from "@/api/course";
 import {
   Card,
   CardContent,
@@ -28,23 +29,22 @@ const StudentManagement = () => {
   const queryClient = useQueryClient();
 
   // 1. Fetch Instructor's Courses
-  const { data: courses = [], isLoading: isCoursesLoading } = useQuery({
+  const { data: coursesData = {}, isLoading: isCoursesLoading } = useQuery({
     queryKey: ["instructor", "courses", user?.id],
-    queryFn: async () => {
-      const response = await api.get("/Course/mine");
-      return response.data;
-    },
+    queryFn: () => courseService.getMyCourses(),
     enabled: !!user && user.role === "Instructor",
   });
 
+  const courses = coursesData.data || [];
+
   // 2. Fetch all enrollments for these courses
   const { data: enrollments = [], isLoading: isEnrollmentsLoading } = useQuery({
-    queryKey: ["instructor", "enrollments", courses.map(c => c._id)],
+    queryKey: ["instructor", "enrollments", courses.map(c => c.courseId)],
     queryFn: async () => {
       const results = await Promise.all(
         courses.map(async (course) => {
-          const response = await api.get(`/Enrollment/ByCourse/${course._id}`);
-          return response.data;
+          const response = await api.get(`/Enrollment/ByCourse/${course.courseId}`);
+          return response.data.data || [];
         })
       );
       return results.flat();
@@ -111,51 +111,48 @@ const StudentManagement = () => {
             <TableBody>
               {enrollments.length > 0 ? (
                 enrollments.map((enrollment) => (
-                  <TableRow key={enrollment._id}>
+                  <TableRow key={enrollment.enrollmentId}>
                     <TableCell>
                       <div className="space-y-0.5">
-                        <p className="font-bold">{enrollment.studentId?.name || "Anonymous User"}</p>
+                        <p className="font-bold">{enrollment.studentName || "Anonymous User"}</p>
                         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                           <Mail className="w-3 h-3" />
-                          {enrollment.studentId?.email}
+                          {enrollment.studentId}
                         </div>
                       </div>
                     </TableCell>
                     <TableCell className="max-w-[200px]">
                       <Badge variant="outline" className="font-medium truncate block">
-                        {enrollment.courseId?.title}
+                        {enrollment.courseTitle}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       <div className="w-32 space-y-1.5">
                         <div className="flex justify-between text-[10px] font-bold uppercase text-muted-foreground">
-                          <span>Progress</span>
-                          <span>{enrollment.progress}%</span>
+                          <span>Status</span>
                         </div>
-                        <Progress value={enrollment.progress} className="h-1.5" />
+                        <Badge variant="outline">Enrolled</Badge>
                       </div>
                     </TableCell>
                     <TableCell>
                       <Badge 
-                        variant={enrollment.status === "Completed" ? "success" : "secondary"}
+                        variant="secondary"
                         className="h-7 gap-1"
                       >
-                        {enrollment.status === "Completed" && <Award className="w-3 h-3" />}
-                        {enrollment.status}
+                        Active
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {new Date(enrollment.createdAt).toLocaleDateString()}
+                      {new Date(enrollment.enrolledAt).toLocaleDateString()}
                     </TableCell>
                     <TableCell className="text-right">
-                      {enrollment.progress === 100 && (
                         <Button
                           size="sm"
                           variant="outline"
                           className="h-8 gap-1 border-primary/20 hover:bg-primary/5 hover:text-primary transition-colors"
                           onClick={() => reissueMutation.mutate({ 
-                            studentId: enrollment.studentId?._id, 
-                            courseId: enrollment.courseId?._id 
+                            studentId: enrollment.studentId, 
+                            courseId: enrollment.courseId 
                           })}
                           disabled={reissueMutation.isPending}
                         >
@@ -164,9 +161,8 @@ const StudentManagement = () => {
                           ) : (
                             <RotateCcw className="w-3.5 h-3.5" />
                           )}
-                          {enrollment.status === "Completed" ? "Regenerate" : "Issue Certificate"}
+                          Issue Certificate
                         </Button>
-                      )}
                     </TableCell>
                   </TableRow>
                 ))

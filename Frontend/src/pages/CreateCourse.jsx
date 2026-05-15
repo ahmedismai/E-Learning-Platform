@@ -23,7 +23,8 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
 import api from "@/api/axios";
-import { levels } from "@/data/mockData";
+import courseService from "@/api/course";
+import { levels } from "@/lib/constants";
 import { Plus, Trash2, Video, Image as ImageIcon, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -64,12 +65,12 @@ const CreateCourse = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const catRes = await api.get("/Category");
+        const catRes = await api.get("/Category/List");
         setRealCategories(catRes.data.data || []);
 
         if (isEditMode) {
-          const courseRes = await api.get(`/Course/${id}`);
-          const course = courseRes.data.data;
+          const courseRes = await courseService.getById(id);
+          const course = courseRes.data;
 
           form.reset({
             title: course.title,
@@ -101,19 +102,26 @@ const CreateCourse = () => {
       formData.append("Description", values.description);
       formData.append("Price", values.price);
       formData.append("CategoryId", values.categoryId);
-      
+      formData.append("IsFree", values.price === 0 ? "true" : "false");
+
       if (values.thumbnail && values.thumbnail instanceof File) {
         formData.append("ImgURL", values.thumbnail);
       }
 
       let currentCourseId = id;
       if (isEditMode) {
-        await api.patch(`/Course/${id}`, formData);
-        toast({ title: "Success!", description: "Course updated successfully." });
+        await courseService.update(id, formData);
+        toast({
+          title: "Success!",
+          description: "Course updated successfully.",
+        });
       } else {
-        const res = await api.post("/Course", formData);
-        currentCourseId = res.data.data;
-        toast({ title: "Success!", description: "Course created! You can now add sections and lessons." });
+        const res = await courseService.create(formData);
+        currentCourseId = res.data;
+        toast({
+          title: "Success!",
+          description: "Course created! You can now add sections and lessons.",
+        });
         navigate(`/dashboard/courses/${currentCourseId}`);
       }
     } catch (error) {
@@ -212,7 +220,10 @@ const CreateCourse = () => {
                         </FormControl>
                         <SelectContent>
                           {realCategories.map((cat) => (
-                            <SelectItem key={cat.categoryId} value={String(cat.categoryId)}>
+                            <SelectItem
+                              key={cat.categoryId}
+                              value={String(cat.categoryId)}
+                            >
                               {cat.categoryName}
                             </SelectItem>
                           ))}

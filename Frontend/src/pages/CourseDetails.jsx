@@ -20,8 +20,9 @@ import {
   MessageSquare,
   Sparkles,
   BrainCircuit,
-  Lightbulb,
   Award,
+  User,
+  GraduationCap,
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useState } from "react";
@@ -31,12 +32,22 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogFooter, // Added for modal actions
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import AIQuizDialog from "@/components/AIQuizDialog";
+import { getFullUrl } from "@/lib/urlHelper";
+import orderService from "@/api/order";
+
+import enrollmentService from "@/api/enrollment";
+import lessonService from "@/api/lesson";
+import lessonProgressService from "@/api/lessonProgress";
+import reviewService from "@/api/review";
+import sectionService from "@/api/section";
+import courseService from "@/api/course";
+import examService from "@/api/exam";
+import { Trash2, Edit2, ClipboardList } from "lucide-react";
 
 const CourseDetails = () => {
   const [activeLesson, setActiveLesson] = useState(null);
@@ -46,41 +57,62 @@ const CourseDetails = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // AI Generation State for Quick Add Content (existing)
-  const [aiGeneratedQuestions, setAiGeneratedQuestions] = useState([]);
-  const [isAiGenerating, setIsAiGenerating] = useState(false); // Used for quick add
-  const [quickAddCount, setQuickAddCount] = useState(5);
-
-  // New AI Assessment Generation State
-  const [isAIGenerationModalOpen, setIsAIGenerationModalOpen] = useState(false);
-  const [aiAssessmentType, setAiAssessmentType] = useState("Quiz");
-  const [aiQuestionCount, setAiQuestionCount] = useState(5);
-  const [isAIGeneratingAssessment, setIsAIGeneratingAssessment] = useState(false); // For dedicated AI button
-
-  // Review State
-  const [isReviewing, setIsReviewing] = useState(false);
-  const [review, setReview] = useState({ rating: 5, comment: "" });
-
-  // Fetch Reviews
-  const { data: reviews = [] } = useQuery({
-    queryKey: ["reviews", id],
-    queryFn: async () => {
-      const response = await api.get(`/Review/course/${id}`);
-      return response.data.data || [];
-    },
-    enabled: !!id,
+  // Queries
+  const { data: courseResponse, isLoading: isCourseLoading } = useQuery({
+    queryKey: ["course", id],
+    queryFn: () => courseService.getById(id),
   });
 
-  // Submit Review Mutation
-  const submitReviewMutation = useMutation({
-    mutationFn: async (reviewData) => {
-      return api.post("/Review", { courseId: parseInt(id), ...reviewData });
-    },
+  const course = courseResponse?.data;
+  const sections = course?.sections || [];
+
+  const { data: reviewsResponse } = useQuery({
+    queryKey: ["reviews", id],
+    queryFn: () => reviewService.getAllByCourse(id),
+  });
+
+  const reviews = reviewsResponse?.data || [];
+
+  const { data: enrollmentsResponse } = useQuery({
+    queryKey: ["enrollments", "me"],
+    queryFn: () => enrollmentService.getByStudent(user.id),
+    enabled: !!user && (user.role === "Student" || user.role === "Admin"),
+  });
+
+  const enrollments = enrollmentsResponse?.data || [];
+  const currentEnrollment = enrollments.find(
+    (e) => e.courseId === parseInt(id),
+  );
+  const isStudentEnrolled = !!currentEnrollment;
+  const isInstructor =
+    user?.role === "Instructor" && course?.instructorId === user?.id;
+  const hasAccess = isInstructor || isStudentEnrolled || user?.role === "Admin";
+
+  const { data: progressResponse } = useQuery({
+    queryKey: ["progress", currentEnrollment?.enrollmentId],
+    queryFn: () =>
+      lessonProgressService.getProgress(currentEnrollment.enrollmentId),
+    enabled: !!currentEnrollment,
+  });
+
+  const progressData = progressResponse?.data;
+
+  // Fetch Exams for this course
+  const { data: examsResponse } = useQuery({
+    queryKey: ["course-exams", id],
+    queryFn: () => examService.getByCourse(id),
+    enabled: hasAccess,
+  });
+  const courseExams = examsResponse?.data || [];
+
+  // Mutations
+  const addReviewMutation = useMutation({
+    mutationFn: (newReview) => reviewService.create(newReview),
     onSuccess: () => {
       queryClient.invalidateQueries(["reviews", id]);
+      toast({ title: "Review submitted successfully!" });
       setIsReviewing(false);
       setReview({ rating: 5, comment: "" });
-      toast({ title: "Review submitted successfully!" });
     },
     onError: (error) => {
       toast({
@@ -91,371 +123,278 @@ const CourseDetails = () => {
     },
   });
 
-  const handleReviewSubmit = () => {
-    if (!review.comment.trim()) return;
-    submitReviewMutation.mutate(review);
-  };
-
-  // AI Assessment Generation Mutation (for the new dedicated button)
-  const generateAIAssessmentMutation = useMutation({
-    mutationFn: async ({ type, count }) => {
-      return api.post("/AI-Assessment/generate", {
-        courseId: parseInt(id),
-        type,
-        count,
-      });
-    },
-    onMutate: () => {
-      setIsAIGeneratingAssessment(true);
-    },
+  const deleteReviewMutation = useMutation({
+    mutationFn: (studentId) => reviewService.delete(id, studentId),
     onSuccess: () => {
-      queryClient.invalidateQueries(["course", id]); // Refresh course content
-      setIsAIGenerationModalOpen(false);
-      setAiQuestionCount(5); // Reset to default
-      toast({
-        title: "AI Assessment Generated! ✨",
-        description: "Your new assessment has been added to the course.",
-      });
+      queryClient.invalidateQueries(["reviews", id]);
+      toast({ title: "Review deleted successfully!" });
     },
     onError: (error) => {
       toast({
         variant: "destructive",
-        title: "AI Generation Failed",
-        description: error.response?.data?.message || "Something went wrong during AI generation.",
+        title: "Failed to delete review",
+        description: error.response?.data?.message || "Something went wrong",
       });
-    },
-    onSettled: () => {
-      setIsAIGeneratingAssessment(false);
     },
   });
 
-  const handleGenerateAssessment = () => {
-    if (aiQuestionCount <= 0) {
-      return toast({
+  const addSectionMutation = useMutation({
+    mutationFn: (sectionData) => sectionService.create(sectionData),
+    onSuccess: () => {
+      queryClient.invalidateQueries(["course", id]);
+      toast({ title: "Section added successfully!" });
+      setIsAddingSection(false);
+      setNewSection({ title: "" });
+    },
+    onError: (error) => {
+      toast({
         variant: "destructive",
-        title: "Invalid Count",
-        description: "Question count must be a positive number.",
+        title: "Failed to add section",
+        description: error.response?.data?.message || "Something went wrong",
       });
-    }
-    generateAIAssessmentMutation.mutate({
-      type: aiAssessmentType,
-      count: aiQuestionCount,
-    });
-  };
-
-  // State for Quick Add Content
-  const [isAddingContent, setIsAddingContent] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [contentType, setContentType] = useState("Lesson");
-  const [newContent, setNewContent] = useState({
-    title: "",
-    description: "",
-    videoFile: null,
-    sectionId: "",
-    duration: 10,
-    dueDate: "",
-  });
-
-  // State for Add Section
-  const [isAddingSection, setIsAddingSection] = useState(false);
-  const [newSection, setNewSection] = useState({
-    title: "",
-    description: "",
-  });
-
-  // Fetch Course Details
-  const { data: course, isLoading } = useQuery({
-    queryKey: ["course", id],
-    queryFn: async () => {
-      const response = await api.get(`/Course/${id}`);
-      return response.data.data;
     },
-    enabled: !!id,
   });
 
-  const sections = course?.sections || [];
-
-  const { data: enrollments = [] } = useQuery({
-    queryKey: ["enrollments", "me"],
-    queryFn: async () => {
-      const response = await api.get(`/Enrollment/ByStudent/${user.id}`);
-      return response.data.data || [];
+  const updateSectionMutation = useMutation({
+    mutationFn: ({ sectionId, title }) =>
+      sectionService.update(sectionId, { title }),
+    onSuccess: () => {
+      queryClient.invalidateQueries(["course", id]);
+      toast({ title: "Section updated successfully!" });
+      setIsAddingSection(false);
+      setIsEditingSection(false);
+      setSelectedSection(null);
+      setNewSection({ title: "" });
     },
-    enabled: !!user && user?.role === "Student",
-  });
-
-  // Permission Logic
-  const isInstructor =
-    user?.role === "Instructor" &&
-    (course?.instructorId === user?.id);
-
-  const isStudentEnrolled = enrollments.some(
-    (e) => e.courseId === parseInt(id),
-  );
-  const currentEnrollment = enrollments.find(
-    (e) => e.courseId === parseInt(id),
-  );
-  const hasAccess = isInstructor || isStudentEnrolled;
-
-  // AI Generate Handler
-  const handleAIGenerate = async () => {
-    if (!id || (contentType !== "Quiz" && contentType !== "Assignment")) return;
-    setIsAiGenerating(true);
-    try {
-      const response = await api.post("/AI-Assessment/generate", {
-        courseId: id,
-        type: contentType,
-        count: quickAddCount,
+    onError: (error) => {
+      toast({
+        variant: "destructive",
+        title: "Failed to update section",
+        description: error.response?.data?.message || "Something went wrong",
       });
+    },
+  });
 
-      const { assessment } = response.data;
+  const deleteSectionMutation = useMutation({
+    mutationFn: (sectionId) => sectionService.delete(sectionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries(["course", id]);
+      toast({ title: "Section deleted successfully!" });
+    },
+    onError: (error) => {
+      toast({
+        variant: "destructive",
+        title: "Failed to delete section",
+        description: error.response?.data?.message || "Something went wrong",
+      });
+    },
+  });
 
-      if (contentType === "Quiz") {
-        setNewContent({
-          ...newContent,
-          title: assessment.title || `Quick Quiz`,
-          description: "AI-Generated Quiz based on lessons.",
+  const enrollMutation = useMutation({
+    mutationFn: async () => {
+      if (!user) {
+        toast({
+          title: "Please login to continue",
+          variant: "destructive",
         });
-        setAiGeneratedQuestions(assessment.questions);
-      } else if (contentType === "Assignment") {
-        const firstTask = assessment.tasks?.[0];
-        setNewContent({
-          ...newContent,
-          title: assessment.title || `Assignment`,
-          description: firstTask ? `${firstTask.description}\n\nSuccess Criteria: ${firstTask.criteria}` : "AI-Generated Assignment.",
+
+        navigate("/login");
+        return;
+      }
+
+      // FREE COURSE => DIRECT ENROLLMENT
+      if (course.isFree) {
+        return enrollmentService.create({
+          courseId: parseInt(id),
         });
       }
 
-      toast({
-        title: "AI Generation Success! ✨",
-        description: `Generated details for your ${contentType} with ${quickAddCount} items. You can now save it.`,
+      // PAID COURSE => CREATE ORDER
+      return orderService.create({
+        courseId: parseInt(id),
       });
-    } catch (error) {
-      console.error("AI Gen Error:", error);
-      toast({
-        variant: "destructive",
-        title: "AI Failed",
-        description: "Could not generate content. Try manual entry.",
-      });
-    } finally {
-      setIsAiGenerating(false);
-    }
-  };
-
-  // Mark Lesson as Complete Mutation
-  const completeLessonMutation = useMutation({
-    mutationFn: async (lessonId) => {
-      return api.patch(`/Enrollment/${currentEnrollment._id}/complete-lesson`, { lessonId });
     },
+
     onSuccess: () => {
       queryClient.invalidateQueries(["enrollments", "me"]);
-      toast({ title: "Lesson marked as complete!" });
+      queryClient.invalidateQueries(["my-orders"]);
+
+      toast({
+        title: course.isFree
+          ? "Enrolled successfully!"
+          : "Order created successfully! Wait for admin approval.",
+      });
     },
+
     onError: (error) => {
       toast({
         variant: "destructive",
-        title: "Failed to update progress",
+
+        title: course.isFree ? "Enrollment failed" : "Order creation failed",
+
         description: error.response?.data?.message || "Something went wrong",
       });
+    },
+  });
+
+  const completeLessonMutation = useMutation({
+    mutationFn: (lessonId) =>
+      lessonProgressService.completeLesson({
+        enrollmentId: currentEnrollment.enrollmentId,
+        lessonId: lessonId,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries([
+        "progress",
+        currentEnrollment?.enrollmentId,
+      ]);
+      queryClient.invalidateQueries(["student-dashboard"]);
+      toast({ title: "Lesson marked as completed!" });
+    },
+    onError: (error) => {
+      if (error.response?.data?.message !== "Lesson already completed") {
+        toast({
+          variant: "destructive",
+          title: "Failed to update progress",
+          description: error.response?.data?.message,
+        });
+      }
     },
   });
 
   const isLessonCompleted = (lessonId) => {
-    return currentEnrollment?.completedLessons?.includes(lessonId);
+    // Note: The backend currently doesn't provide a list of completed lesson IDs in GetProgress.
+    // As a workaround, we can't accurately show which lessons are completed after a refresh
+    // unless the backend is updated. For now, we'll just return false.
+    return false;
   };
 
-  const calculateProgress = () => {
-    if (!currentEnrollment) return 0;
-    return currentEnrollment.progress || 0;
-  };
+  // AI Generation State
+  const [isAiGenerating, setIsAiGenerating] = useState(false);
+  const [quickAddCount, setQuickAddCount] = useState(5);
 
-  // Certificate Generation Mutation
-  const [isGeneratingCert, setIsGeneratingCert] = useState(false);
-  const generateCertificate = async () => {
-    setIsGeneratingCert(true);
-    try {
-      const response = await api.post("/Certificate/generate", { courseId: id });
-      window.open(response.data.certificateUrl, "_blank");
-      toast({ title: "Certificate generated successfully! 🎓" });
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Failed to generate certificate",
-        description: error.response?.data?.message || "Please try again later.",
+  // Review State
+  const [isReviewing, setIsReviewing] = useState(false);
+  const [review, setReview] = useState({ rating: 5, comment: "" });
+
+  // Lesson Management State
+  const [isAddingContent, setIsAddingContent] = useState(false);
+  const [isEditingLesson, setIsEditingLesson] = useState(false);
+  const [selectedLesson, setSelectedLesson] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [newContent, setNewContent] = useState({
+    title: "",
+    videoFile: null,
+    sectionId: "",
+    duration: 10,
+  });
+
+  const [isAddingSection, setIsAddingSection] = useState(false);
+  const [isEditingSection, setIsEditingSection] = useState(false);
+  const [selectedSection, setSelectedSection] = useState(null);
+  const [newSection, setNewSection] = useState({ title: "" });
+
+  const handleSaveSection = async () => {
+    if (!newSection.title) return;
+    if (isEditingSection && selectedSection) {
+      updateSectionMutation.mutate({
+        sectionId: selectedSection.sectionId,
+        title: newSection.title,
       });
-    } finally {
-      setIsGeneratingCert(false);
+    } else {
+      addSectionMutation.mutate({
+        courseId: parseInt(id),
+        title: newSection.title,
+      });
     }
   };
 
-  // Enrollment Mutation
-  const enrollMutation = useMutation({
-    mutationFn: async () => {
-      return api.post("/Enrollment", { courseId: id, paymentMethod: "Visa" });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries(["enrollments", "me"]);
-      toast({ title: "Enrolled successfully!" });
-    },
-    onError: (error) => {
-      toast({
-        variant: "destructive",
-        title: "Enrollment failed",
-        description: error.response?.data?.message || "Something went wrong",
-      });
-    },
-  });
+  const openEditSection = (section) => {
+    setSelectedSection(section);
+    setNewSection({ title: section.title });
+    setIsEditingSection(true);
+    setIsAddingSection(true);
+  };
 
-  // Create Section Mutation
-  const createSectionMutation = useMutation({
-    mutationFn: async (sectionData) => {
-      return api.post("/Section", { courseId: id, ...sectionData });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries(["course", id]);
-      setIsAddingSection(false);
-      setNewSection({ title: "", description: "" });
-      toast({ title: "Section created successfully!" });
-    },
-    onError: (error) => {
-      toast({
-        variant: "destructive",
-        title: "Failed to create section",
-        description: error.response?.data?.message || "Something went wrong",
-      });
-    },
-  });
-
-  // Handler for Quick Add Content
   const handleAddContent = async () => {
-    if (!newContent.title) {
-      return toast({
-        variant: "destructive",
-        title: "Missing Fields",
-        description: "Please provide a title.",
-      });
-    }
-
-    if (contentType === "Lesson" && !newContent.videoFile) {
-        return toast({
-          variant: "destructive",
-          title: "Video Required",
-          description: "Please select a video file for the lesson.",
-        });
-    }
-
-    if (contentType === "Assignment" && !newContent.dueDate) {
-        return toast({
-          variant: "destructive",
-          title: "Due Date Required",
-          description: "Please select a due date for the assignment.",
-        });
-    }
-
+    if (!newContent.title || !newContent.sectionId) return;
     setIsUploading(true);
     try {
-      let videoUrl = "";
-      if (contentType === "Lesson" && newContent.videoFile) {
-        const formData = new FormData();
-        formData.append("file", newContent.videoFile);
-        formData.append("upload_preset", "ml_default");
-        formData.append("folder", "learnhub_courses");
+      const formData = new FormData();
+      formData.append("SectionId", newContent.sectionId);
+      formData.append("Title", newContent.title);
+      if (newContent.videoFile) {
+        formData.append("File", newContent.videoFile);
+      }
+      formData.append("LessonType", "0");
+      formData.append("DurationInMinutes", String(newContent.duration));
 
-        const cloudRes = await fetch(
-          `https://api.cloudinary.com/v1_1/duevc5acm/video/upload`,
-          { method: "POST", body: formData },
-        );
-
-        if (!cloudRes.ok) throw new Error("Cloudinary upload failed");
-        const cloudData = await cloudRes.json();
-        videoUrl = cloudData.secure_url;
+      if (isEditingLesson && selectedLesson) {
+        await lessonService.update(selectedLesson.lessonId, formData);
+        toast({ title: "Lesson updated successfully!" });
+      } else {
+        await lessonService.create(formData);
+        toast({ title: "Lesson added successfully!" });
       }
 
-      const contentPayload = {
-        title: newContent.title,
-        description: newContent.description || "No description provided.",
-        type: contentType,
-        sectionId: newContent.sectionId || undefined,
-      };
-
-      if (contentType === "Lesson") {
-        contentPayload.videoUrl = videoUrl;
-      } else if (contentType === "Quiz") {
-        contentPayload.duration = newContent.duration;
-        // Include AI Generated questions if they exist
-        if (aiGeneratedQuestions.length > 0) {
-           contentPayload.questions = aiGeneratedQuestions;
-        }
-      } else if (contentType === "Assignment") {
-        contentPayload.dueDate = newContent.dueDate;
-      }
-
-      await api.post(`/Course/${id}/contents`, contentPayload);
-
-      toast({
-        title: "Success",
-        description: `${contentType} added successfully!`,
-      });
-
+      queryClient.invalidateQueries(["course", id]);
       setIsAddingContent(false);
-      setAiGeneratedQuestions([]);
+      setIsEditingLesson(false);
+      setSelectedLesson(null);
       setNewContent({
         title: "",
-        description: "",
         videoFile: null,
         sectionId: "",
         duration: 10,
-        dueDate: "",
       });
-      queryClient.invalidateQueries(["course", id]);
     } catch (error) {
-      console.error("Add Content Error:", error);
       toast({
         variant: "destructive",
-        title: "Operation Failed",
-        description: error.response?.data?.message || "Could not save content.",
+        title: isEditingLesson
+          ? "Failed to update lesson"
+          : "Failed to add lesson",
       });
     } finally {
       setIsUploading(false);
     }
   };
 
-  const handleAddSection = () => {
-    if (!newSection.title || !newSection.description) {
-      return toast({
-        variant: "destructive",
-        title: "Missing Fields",
-        description: "Please provide both title and description.",
-      });
+  const handleDeleteLesson = async (lessonId) => {
+    if (!window.confirm("Are you sure you want to delete this lesson?")) return;
+    try {
+      await lessonService.delete(lessonId);
+      queryClient.invalidateQueries(["course", id]);
+      toast({ title: "Lesson deleted successfully!" });
+      if (activeLesson?.lessonId === lessonId) setActiveLesson(null);
+    } catch (error) {
+      toast({ variant: "destructive", title: "Failed to delete lesson" });
     }
-    createSectionMutation.mutate(newSection);
   };
 
-  if (isLoading)
+  const openEditLesson = (lesson) => {
+    setSelectedLesson(lesson);
+    setNewContent({
+      title: lesson.title,
+      videoFile: null,
+      sectionId: String(lesson.sectionId),
+      duration: lesson.durationInMinutes || 10,
+    });
+    setIsEditingLesson(true);
+    setIsAddingContent(true);
+  };
+
+  if (isCourseLoading || isUploading) {
     return (
-      <div className="p-8 text-center text-lg font-medium flex items-center justify-center gap-2">
-        <Loader2 className="animate-spin" /> Loading course details...
+      <div className="p-8 text-center">
+        <Loader2 className="animate-spin inline mr-2" />
+        Loading...
       </div>
     );
+  }
 
-  if (!course)
-    return (
-      <div className="p-8 text-center text-lg font-medium">
-        Course not found
-      </div>
-    );
-
-  const getFullUrl = (path) => {
-    if (!path) return "";
-    if (path.startsWith("http")) return path;
-    const baseUrl = api.defaults.baseURL.replace("/api", "");
-    return `${baseUrl}/${path.replace(/\\/g, "/")}`;
-  };
-
-  const getLessonTypeLabel = (type) => {
-    const types = ["Video", "PDF", "Text"];
-    return types[type] || "Lesson";
-  };
+  if (!course) {
+    return <div className="p-8 text-center">Course not found.</div>;
+  }
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-fade-in pb-12">
@@ -463,265 +402,273 @@ const CourseDetails = () => {
         <div className="lg:col-span-2 space-y-8">
           <div className="space-y-4">
             <Badge variant="secondary" className="px-3 py-1">
-              {course.categoryName || "General"}
+              {course.categoryName}
             </Badge>
-            <h1 className="text-4xl font-bold tracking-tight text-foreground">
+            <h1 className="text-4xl font-bold tracking-tight">
               {course.title}
             </h1>
-            <div className="flex flex-wrap gap-6 pt-4">
+            <div className="flex flex-wrap gap-6 pt-4 text-muted-foreground">
               <div className="flex items-center gap-2">
-                <Users className="w-5 h-5 text-primary" />
-                <span className="font-medium">
-                  {course.instructorName || "Instructor"}
+                <User className="w-5 h-5 text-primary" />
+                <span className="font-medium text-foreground">
+                  {course.instructorName}
                 </span>
               </div>
-              <div className="flex items-center gap-2 text-muted-foreground">
+              <div className="flex items-center gap-2">
                 <Clock className="w-5 h-5" />
-                <span>{course.sections?.reduce((acc, s) => acc + (s.lessons?.length || 0), 0)} items</span>
+                <span>
+                  {sections.reduce(
+                    (acc, s) => acc + (s.lessons?.length || 0),
+                    0,
+                  )}{" "}
+                  lessons
+                </span>
               </div>
             </div>
           </div>
 
-          <div className="aspect-video relative rounded-2xl overflow-hidden bg-black border shadow-sm border-primary/20">
-            {hasAccess && activeLesson?.contentUrl ? (
+          <div className="aspect-video relative rounded-2xl overflow-hidden bg-black border shadow-sm">
+            {hasAccess && activeLesson ? (
               <video
-                key={activeLesson.contentUrl}
-                src={getFullUrl(activeLesson.contentUrl)}
+                key={activeLesson.lessonId}
+                src={activeLesson.contentUrl}
                 controls
                 className="w-full h-full"
                 autoPlay
-                poster={getFullUrl(course.imgPath)}
-                onEnded={() => {
-                  if (!isLessonCompleted(activeLesson.lessonId)) {
-                    completeLessonMutation.mutate(activeLesson.lessonId);
-                  }
-                }}
+                onEnded={() =>
+                  !isLessonCompleted(activeLesson.lessonId) &&
+                  completeLessonMutation.mutate(activeLesson.lessonId)
+                }
               />
             ) : (
               <div className="relative w-full h-full">
                 {course.imgPath ? (
                   <img
                     src={getFullUrl(course.imgPath)}
-                    alt={course.title}
                     className="w-full h-full object-cover opacity-60"
                   />
                 ) : (
                   <div className="w-full h-full bg-slate-900" />
                 )}
-                {!hasAccess ? (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                    <Play className="w-16 h-16 text-white/80" />
-                  </div>
-                ) : (
-                  !activeLesson && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 text-white space-y-4">
-                      <Play className="w-16 h-16 text-white/80" />
-                      <p className="text-lg font-medium">
-                        Select a lesson to start learning
-                      </p>
-                    </div>
-                  )
-                )}
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                  <Play className="w-16 h-16 text-white/80" />
+                </div>
               </div>
             )}
           </div>
 
-          <Card className="border-none shadow-md overflow-hidden">
+          <Card className="border-none shadow-md">
             {isStudentEnrolled && (
               <div className="p-6 bg-primary/5 border-b space-y-3">
-                <div className="flex justify-between items-center">
-                  <h3 className="font-bold text-primary flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5" />
-                    Your Progress
-                  </h3>
-                  <span className="font-bold text-primary">{calculateProgress()}%</span>
+                <div className="flex justify-between items-center font-bold">
+                  <span>Progress</span>
+                  <span>{currentEnrollment.progress}%</span>
                 </div>
-                <div className="h-3 w-full bg-primary/10 rounded-full overflow-hidden">
-                  <div 
-                    className={`h-full transition-all duration-500 ${
-                      calculateProgress() > 80 
-                        ? "bg-green-500" 
-                        : calculateProgress() >= 50 
-                        ? "bg-yellow-500" 
-                        : "bg-blue-500"
-                    }`} 
-                    style={{ width: `${calculateProgress()}%` }}
+                <div className="h-2 w-full bg-primary/10 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary transition-all"
+                    style={{ width: `${currentEnrollment.progress}%` }}
                   />
                 </div>
               </div>
             )}
             <CardHeader className="border-b">
-              <CardTitle className="flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-primary" />
-                Course Content
-              </CardTitle>
+              <CardTitle>Course Content</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="divide-y divide-border">
-                {sections.map((section) => (
-                  <div key={section.sectionId} className="p-5">
-                    <h3 className="font-bold text-lg mb-3">{section.title}</h3>
-                    <div className="space-y-2">
-                      {section.lessons?.map((lesson, index) => (
-                          <div
-                            key={lesson.lessonId}
-                            className={`flex items-center justify-between p-3 cursor-pointer transition-all rounded group ${
-                              activeLesson?.lessonId === lesson.lessonId
-                                ? "bg-primary/5 border-l-4 border-primary"
-                                : "hover:bg-accent/5 border-l-4 border-transparent"
-                            }`}
-                            onClick={() =>
-                              hasAccess &&
-                              getLessonTypeLabel(lesson.lessonType) === "Video" &&
-                              setActiveLesson(lesson)
-                            }
+              {sections.length > 0 ? (
+                sections.map((section) => (
+                  <div
+                    key={section.sectionId}
+                    className="p-5 border-b last:border-0 group/section"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-bold text-lg">{section.title}</h3>
+                      {isInstructor && (
+                        <div className="flex gap-1 opacity-0 group-hover/section:opacity-100 transition-opacity">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-primary"
+                            onClick={() => openEditSection(section)}
                           >
-                            <div className="flex items-center gap-4">
-                              <div
-                                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                                  isLessonCompleted(lesson.lessonId)
-                                    ? "bg-green-500 text-white"
-                                    : activeLesson?.lessonId === lesson.lessonId
-                                      ? "bg-primary text-primary-foreground"
-                                      : "bg-accent/20 text-muted-foreground"
-                                }`}
-                              >
-                                {isLessonCompleted(lesson.lessonId) ? <CheckCircle2 className="w-5 h-5" /> : index + 1}
-                              </div>
-                              <div>
-                                <p
-                                  className={`font-semibold ${activeLesson?.lessonId === lesson.lessonId ? "text-primary" : ""}`}
-                                >
-                                  {lesson.title}
-                                </p>
-                                <Badge
-                                  variant="outline"
-                                  className="text-[10px] uppercase h-5"
-                                >
-                                  {getLessonTypeLabel(lesson.lessonType)}
-                                </Badge>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              {isStudentEnrolled && getLessonTypeLabel(lesson.lessonType) === "Video" && (
-                                <Button
-                                  size="sm"
-                                  variant={isLessonCompleted(lesson.lessonId) ? "ghost" : "outline"}
-                                  className={`opacity-0 group-hover:opacity-100 transition-opacity ${isLessonCompleted(lesson.lessonId) ? "text-green-600" : ""}`}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (!isLessonCompleted(lesson.lessonId)) {
-                                      completeLessonMutation.mutate(lesson.lessonId);
-                                    }
-                                  }}
-                                  disabled={isLessonCompleted(lesson.lessonId) || completeLessonMutation.isPending}
-                                >
-                                  {isLessonCompleted(lesson.lessonId) ? "Completed" : "Mark Done"}
-                                </Button>
-                              )}
-                              {getLessonTypeLabel(lesson.lessonType) === "Video" ? (
-                                <Play
-                                  className={`w-5 h-5 ${activeLesson?.lessonId === lesson.lessonId ? "text-primary animate-pulse" : "text-muted-foreground/40"}`}
-                                />
+                            <Edit2 className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-destructive"
+                            onClick={() => {
+                              if (
+                                confirm("Delete section and all its lessons?")
+                              ) {
+                                deleteSectionMutation.mutate(section.sectionId);
+                              }
+                            }}
+                            disabled={deleteSectionMutation.isPending}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      {section.lessons?.map((lesson, idx) => (
+                        <div
+                          key={lesson.lessonId}
+                          className={`flex items-center justify-between p-3 rounded cursor-pointer transition-all ${activeLesson?.lessonId === lesson.lessonId ? "bg-primary/5 border-l-4 border-primary" : "hover:bg-accent/5"}`}
+                          onClick={() =>
+                            hasAccess &&
+                            lesson.lessonType === "Video" &&
+                            setActiveLesson(lesson)
+                          }
+                        >
+                          <div className="flex items-center gap-4">
+                            <div
+                              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${isLessonCompleted(lesson.lessonId) ? "bg-green-500 text-white" : "bg-muted"}`}
+                            >
+                              {isLessonCompleted(lesson.lessonId) ? (
+                                <CheckCircle2 className="w-5 h-5" />
                               ) : (
-                                <FileText className="w-5 h-5 text-muted-foreground/40" />
+                                idx + 1
                               )}
+                            </div>
+                            <div>
+                              <p className="font-semibold">{lesson.title}</p>
+                              <Badge variant="outline" className="text-[10px]">
+                                {lesson.lessonType === "Video"
+                                  ? "Video"
+                                  : "File"}
+                              </Badge>
                             </div>
                           </div>
-                        ))}
+                          <div className="flex items-center gap-2">
+                            {isInstructor && (
+                              <>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-8 w-8 text-primary"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openEditLesson(lesson);
+                                  }}
+                                >
+                                  <PlusCircle className="w-4 h-4 rotate-45" />
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-8 w-8 text-destructive"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteLesson(lesson.lessonId);
+                                  }}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </>
+                            )}
+                            {isStudentEnrolled && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={
+                                  isLessonCompleted(lesson.lessonId) ||
+                                  completeLessonMutation.isPending
+                                }
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  completeLessonMutation.mutate(
+                                    lesson.lessonId,
+                                  );
+                                }}
+                              >
+                                {isLessonCompleted(lesson.lessonId)
+                                  ? "Completed"
+                                  : "Mark Done"}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                ))}
-              </div>
+                ))
+              ) : (
+                <div className="p-8 text-center text-muted-foreground">
+                  No content available for this course.
+                </div>
+              )}
             </CardContent>
           </Card>
 
+          {/* Reviews Section */}
           <Card className="border-none shadow-md">
             <CardHeader className="border-b flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2">
-                <MessageSquare className="w-5 h-5 text-primary" />
-                Student Reviews
+                <MessageSquare className="w-5 h-5 text-primary" /> Student
+                Reviews
               </CardTitle>
-              {isStudentEnrolled && (
-                <Dialog open={isReviewing} onOpenChange={setIsReviewing}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" size="sm">
-                      Write a Review
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Share your experience</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 pt-4">
-                      <div className="space-y-2">
-                        <Label>Rating (1-5)</Label>
-                        <div className="flex gap-2">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <button
-                              key={star}
-                              onClick={() => setReview({ ...review, rating: star })}
-                              className={`text-2xl ${review.rating >= star ? "text-yellow-500" : "text-muted"}`}
-                            >
-                              <Star className={review.rating >= star ? "fill-yellow-500" : ""} />
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="comment">Your Feedback</Label>
-                        <Textarea
-                          id="comment"
-                          placeholder="What did you think of this course?"
-                          value={review.comment}
-                          onChange={(e) => setReview({ ...review, comment: e.target.value })}
-                        />
-                      </div>
-                      <Button
-                        className="w-full"
-                        onClick={handleReviewSubmit}
-                        disabled={submitReviewMutation.isPending || !review.comment.trim()}
-                      >
-                        {submitReviewMutation.isPending ? "Submitting..." : "Post Review"}
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
+              {isStudentEnrolled && !isInstructor && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsReviewing(true)}
+                >
+                  Write a Review
+                </Button>
               )}
             </CardHeader>
             <CardContent className="p-6">
               <div className="space-y-6">
                 {reviews.length > 0 ? (
-                  reviews.map((r) => (
-                    <div key={r._id} className="flex gap-4 border-b last:border-0 pb-6 last:pb-0">
+                  reviews.map((r, i) => (
+                    <div
+                      key={i}
+                      className="flex gap-4 border-b last:border-0 pb-6 group"
+                    >
                       <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary shrink-0">
-                        {r.studentId?.name?.[0] || "U"}
+                        {r.studentName?.[0]}
                       </div>
-                      <div className="space-y-1 flex-1">
-                        <div className="flex justify-between items-center">
-                          <h4 className="font-bold">{r.studentId?.name || "User"}</h4>
-                          <div className="flex text-yellow-500">
-                            {Array.from({ length: 5 }).map((_, i) => (
-                              <Star
-                                key={i}
-                                className={`w-3 h-3 ${i < r.rating ? "fill-yellow-500" : "text-muted"}`}
-                              />
-                            ))}
+                      <div className="flex-1">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h4 className="font-bold">{r.studentName}</h4>
+                            <div className="flex items-center gap-1 my-1">
+                              {[...Array(5)].map((_, i) => (
+                                <Star
+                                  key={i}
+                                  className={`w-3 h-3 ${i < r.rating ? "text-amber-500 fill-amber-500" : "text-muted"}`}
+                                />
+                              ))}
+                            </div>
                           </div>
+                          {(user?.id === r.studentId ||
+                            user?.role === "Admin") && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() =>
+                                deleteReviewMutation.mutate(r.studentId)
+                              }
+                              disabled={deleteReviewMutation.isPending}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
                         </div>
-                        <p className="text-muted-foreground text-sm italic">
+                        <p className="text-sm italic text-muted-foreground mt-2">
                           "{r.comment}"
-                        </p>
-                        <p className="text-[10px] text-muted-foreground pt-1">
-                          {new Date(r.createdAt).toLocaleDateString()}
                         </p>
                       </div>
                     </div>
                   ))
                 ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <p>No reviews yet. Be the first to review!</p>
-                  </div>
+                  <p className="text-center text-muted-foreground py-4">
+                    No reviews yet. Be the first to review!
+                  </p>
                 )}
               </div>
             </CardContent>
@@ -729,360 +676,252 @@ const CourseDetails = () => {
         </div>
 
         <div className="lg:col-span-1">
-          <Card className="sticky top-24 border-2 border-primary/10 shadow-xl overflow-hidden">
-            {isInstructor ? (
-              <CardContent className="p-8 space-y-6">
-                <div className="flex flex-col items-center text-center space-y-4">
-                  <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
-                    <Users className="w-10 h-10 text-primary" />
-                  </div>
-                  <div className="space-y-2">
-                    <Badge className="bg-primary/10 text-primary">
-                      Instructor View
-                    </Badge>
-                    <h3 className="text-xl font-bold">Course Management</h3>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <AIQuizDialog 
-                    courseId={id} 
-                    mode="instructor" 
-                    buttonText="AI Smart Generator" 
-                  />
-                  
-                  {/* Existing Add Content Dialog */}
-                  <Dialog
-                    open={isAddingContent}
-                  onOpenChange={(open) => {
-                    setIsAddingContent(open);
-                    if (!open) {
-                      setAiGeneratedQuestions([]);
-                      setNewContent({ title: "", description: "", videoFile: null, sectionId: "", duration: 10, dueDate: "" });
-                    }
-                  }}
-                >
-                  <DialogTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full py-6 flex items-center gap-2 border-dashed border-2 border-primary/50 hover:bg-primary/5"
-                    >
-                      <PlusCircle className="w-5 h-5 text-primary" /> Add Content
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <div className="flex justify-between items-center">
-                         <DialogTitle>Add New Content</DialogTitle>
-                         {(contentType === "Quiz" || contentType === "Assignment") && (
-                           <div className="flex items-center gap-2">
-                             <Input 
-                                type="number"
-                                min="1"
-                                max="15"
-                                value={quickAddCount}
-                                onChange={(e) => setQuickAddCount(parseInt(e.target.value) || 1)}
-                                className="w-16 h-8 text-center text-xs border-primary/30"
-                             />
-                             <Button 
-                              variant="outline" 
-                              size="sm" 
-                              onClick={handleAIGenerate}
-                              disabled={isAiGenerating}
-                              className="text-xs border-primary text-primary"
-                             >
-                                {isAiGenerating ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Sparkles className="w-3 h-3 mr-1" />}
-                                AI Smart Fill
-                             </Button>
-                           </div>
-                         )}
-                      </div>
-                    </DialogHeader>
-                    <div className="space-y-4 pt-4">
-                      <div className="space-y-2">
-                        <Label>Content Type</Label>
-                        <select
-                          className="w-full p-2 border rounded"
-                          value={contentType}
-                          onChange={(e) => {
-                            setContentType(e.target.value);
-                            setAiGeneratedQuestions([]);
-                          }}
-                        >
-                          <option value="Lesson">Lesson (Video)</option>
-                          <option value="Quiz">Quiz</option>
-                          <option value="Assignment">Assignment</option>
-                        </select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="title">Title</Label>
-                        <Input
-                          id="title"
-                          value={newContent.title}
-                          onChange={(e) =>
-                            setNewContent({
-                              ...newContent,
-                              title: e.target.value,
-                            })
-                          }
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="desc">Description</Label>
-                        <Textarea
-                          id="desc"
-                          value={newContent.description}
-                          onChange={(e) =>
-                            setNewContent({
-                              ...newContent,
-                              description: e.target.value,
-                            })
-                          }
-                          className="min-h-[100px]"
-                        />
-                      </div>
-
-                      {contentType === "Lesson" && (
-                        <div className="space-y-2">
-                          <Label htmlFor="video">Video File</Label>
-                          <Input
-                            id="video"
-                            type="file"
-                            accept="video/*"
-                            onChange={(e) =>
-                              setNewContent({
-                                ...newContent,
-                                videoFile: e.target.files[0],
-                              })
-                            }
-                          />
-                        </div>
-                      )}
-
-                      {contentType === "Quiz" && (
-                        <div className="space-y-2">
-                          <div className="flex justify-between items-center">
-                            <Label htmlFor="duration">Duration (minutes)</Label>
-                            {aiGeneratedQuestions.length > 0 && (
-                              <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200">
-                                {aiGeneratedQuestions.length} AI Questions Ready
-                              </Badge>
-                            )}
-                          </div>
-                          <Input
-                            id="duration"
-                            type="number"
-                            value={newContent.duration}
-                            onChange={(e) =>
-                              setNewContent({
-                                ...newContent,
-                                duration: parseInt(e.target.value),
-                              })
-                            }
-                          />
-                        </div>
-                      )}
-
-                      {contentType === "Assignment" && (
-                        <div className="space-y-2">
-                          <Label htmlFor="dueDate">Due Date</Label>
-                          <Input
-                            id="dueDate"
-                            type="date"
-                            value={newContent.dueDate}
-                            onChange={(e) =>
-                              setNewContent({
-                                ...newContent,
-                                dueDate: e.target.value,
-                              })
-                            }
-                          />
-                        </div>
-                      )}
-
-                      <div className="space-y-2">
-                        <Label htmlFor="section">Section</Label>
-                        <select
-                          id="section"
-                          value={newContent.sectionId}
-                          onChange={(e) =>
-                            setNewContent({
-                              ...newContent,
-                              sectionId: e.target.value,
-                            })
-                          }
-                          className="w-full p-2 border rounded"
-                        >
-                          <option value="">Select Section</option>
-                          {sections.map((s) => (
-                            <option key={s._id} value={s._id}>
-                              {s.title}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <Button
-                        className="w-full py-6 text-lg font-bold"
-                        onClick={handleAddContent}
-                        disabled={isUploading}
-                      >
-                        {isUploading ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />{" "}
-                            Processing...
-                          </>
-                        ) : (
-                          `Save ${contentType}`
-                        )}
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-
-                {/* Existing Add Section Dialog */}
-                <Dialog
-                  open={isAddingSection}
-                  onOpenChange={setIsAddingSection}
-                >
-                  <DialogTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full py-4 flex items-center gap-2 border-dashed border-2 border-green-500/50"
-                    >
-                      <PlusCircle className="w-5 h-5 text-green-500" /> Add
-                      Section
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Add New Section</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 pt-4">
-                      <Label htmlFor="s-title">Title</Label>
-                      <Input
-                        id="s-title"
-                        value={newSection.title}
-                        onChange={(e) =>
-                          setNewSection({
-                            ...newSection,
-                            title: e.target.value,
-                          })
-                        }
-                      />
-                      <Label htmlFor="s-desc">Description</Label>
-                      <Input
-                        id="s-desc"
-                        value={newSection.description}
-                        onChange={(e) =>
-                          setNewSection({
-                            ...newSection,
-                            description: e.target.value,
-                          })
-                        }
-                      />
-                      <Button
-                        className="w-full"
-                        onClick={handleAddSection}
-                        disabled={createSectionMutation.isPending}
-                      >
-                        {createSectionMutation.isPending
-                          ? "Creating..."
-                          : "Add Section"}
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-
-                <Button
-                  className="w-full py-6 text-lg font-bold"
-                  onClick={() => navigate(`/dashboard/edit-course/${id}`)}
-                >
-                  Edit Full Course
-                </Button>
-                </div>
-              </CardContent>
-            ) : !isStudentEnrolled ? (
+          <Card className="sticky top-24 border-2 shadow-xl">
+            {!hasAccess ? (
               <>
                 <div className="bg-primary/5 p-8 text-center border-b">
                   <span className="text-4xl font-bold text-primary">
                     ${course.price}
                   </span>
                 </div>
-                <CardContent className="p-8 space-y-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-3 text-sm">
-                      <ShieldCheck className="w-5 h-5 text-green-500" />{" "}
-                      <span>Full lifetime access</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-sm">
-                      <BookOpen className="w-5 h-5 text-primary" />{" "}
-                      <span>{course.contents?.length || 0} items</span>
-                    </div>
-                  </div>
+                <CardContent className="p-8">
                   <Button
                     className="w-full py-6 text-lg font-bold"
                     onClick={() => enrollMutation.mutate()}
                     disabled={enrollMutation.isPending}
                   >
-                    {enrollMutation.isPending ? "Processing..." : "Enroll Now"}
+                    {enrollMutation.isPending
+                      ? "Processing..."
+                      : course.isFree
+                        ? "Enroll Now"
+                        : "Create Order"}
                   </Button>
                 </CardContent>
               </>
-            ) : (
-              <CardContent className="p-8 space-y-6">
-                <div className="flex flex-col items-center text-center space-y-4">
-                  <div className={`w-16 h-16 ${currentEnrollment?.status === "Completed" ? "bg-amber-100" : "bg-green-100"} rounded-full flex items-center justify-center`}>
-                    {currentEnrollment?.status === "Completed" ? (
-                      <Award className="w-10 h-10 text-amber-600" />
-                    ) : (
-                      <CheckCircle2 className="w-10 h-10 text-green-600" />
-                    )}
-                  </div>
-                  <h3 className="text-xl font-bold">
-                    {currentEnrollment?.status === "Completed" ? "Course Completed!" : "You're Enrolled!"}
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {currentEnrollment?.status === "Completed" 
-                      ? "Congratulations! You've successfully finished this course." 
-                      : "Start learning from the list on the left."}
-                  </p>
-                </div>
-
-                {currentEnrollment?.status === "Completed" && (
-                  <Button 
-                    className="w-full py-6 text-lg font-bold bg-amber-500 hover:bg-amber-600 shadow-lg shadow-amber-200"
-                    onClick={generateCertificate}
-                    disabled={isGeneratingCert}
-                  >
-                    {isGeneratingCert ? (
-                      <>
-                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <Award className="w-5 h-5 mr-2" />
-                        Download Certificate
-                      </>
-                    )}
+            ) : isInstructor ? (
+              <CardContent className="p-8 space-y-4">
+                <h3 className="text-xl font-bold text-center">
+                  Instructor Control
+                </h3>
+                <AIQuizDialog
+                  courseId={id}
+                  mode="instructor"
+                  buttonText="AI Course Builder"
+                />
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setIsAddingSection(true)}
+                >
+                  Add Section
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setIsAddingContent(true)}
+                >
+                  Add Lesson
+                </Button>
+                <div className="pt-4 border-t space-y-3">
+                  <Button variant="secondary" className="w-full" asChild>
+                    <Link to={`/dashboard/create-exam?courseId=${id}`}>
+                      <PlusCircle className="w-4 h-4 mr-2" />
+                      Create Final Exam
+                    </Link>
                   </Button>
-                )}
-
+                  {courseExams.length > 0 && (
+                    <Button variant="outline" className="w-full" asChild>
+                      <Link to={`/dashboard/student-results/${id}`}>
+                        <ClipboardList className="w-4 h-4 mr-2" />
+                        View Exam Results
+                      </Link>
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            ) : (
+              <CardContent className="p-8 text-center space-y-4">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+                  <CheckCircle2 className="w-10 h-10 text-green-600" />
+                </div>
+                <h3 className="text-xl font-bold">You're Enrolled!</h3>
+                <AIQuizDialog
+                  courseId={id}
+                  mode="student"
+                  buttonText="AI Study Companion"
+                />
                 <Button
                   variant="outline"
                   className="w-full"
                   onClick={() => navigate("/dashboard/my-courses")}
                 >
-                  Back to My Courses
+                  My Courses
                 </Button>
-                <AIQuizDialog courseId={id} mode="student" />
+
+                {progressData?.canTakeExam && courseExams.length > 0 && (
+                  <div className="pt-4 border-t space-y-3">
+                    <p className="text-sm font-medium text-muted-foreground flex items-center justify-center gap-2">
+                      <GraduationCap className="w-4 h-4 text-primary" />
+                      Course Completed!
+                    </p>
+                    {courseExams.map((exam) => (
+                      <Button
+                        key={exam.examId}
+                        className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-6 shadow-lg shadow-primary/20"
+                        asChild
+                      >
+                        <Link to={`/dashboard/exam/${exam.examId}?type=exam`}>
+                          <Play className="w-4 h-4 mr-2" />
+                          Take Final Exam: {exam.title}
+                        </Link>
+                      </Button>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             )}
           </Card>
         </div>
       </div>
+
+      {/* Instructor Modals */}
+      <Dialog
+        open={isAddingSection}
+        onOpenChange={(open) => {
+          setIsAddingSection(open);
+          if (!open) {
+            setIsEditingSection(false);
+            setSelectedSection(null);
+            setNewSection({ title: "" });
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {isEditingSection ? "Edit Section" : "New Section"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <Label>Title</Label>
+            <Input
+              value={newSection.title}
+              onChange={(e) => setNewSection({ title: e.target.value })}
+              placeholder="Section title..."
+            />
+            <Button
+              className="w-full"
+              onClick={handleSaveSection}
+              disabled={
+                addSectionMutation.isPending || updateSectionMutation.isPending
+              }
+            >
+              {addSectionMutation.isPending || updateSectionMutation.isPending
+                ? "Saving..."
+                : "Save Section"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isAddingContent} onOpenChange={setIsAddingContent}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>New Lesson</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <Label>Title</Label>
+            <Input
+              value={newContent.title}
+              onChange={(e) =>
+                setNewContent({ ...newContent, title: e.target.value })
+              }
+            />
+            <Label>Section</Label>
+            <select
+              className="w-full p-2 border rounded"
+              value={newContent.sectionId}
+              onChange={(e) =>
+                setNewContent({ ...newContent, sectionId: e.target.value })
+              }
+            >
+              <option value="">Select Section</option>
+              {sections.map((s) => (
+                <option key={s.sectionId} value={s.sectionId}>
+                  {s.title}
+                </option>
+              ))}
+            </select>
+            <Label>Video File</Label>
+            <Input
+              type="file"
+              accept="video/*"
+              onChange={(e) =>
+                setNewContent({ ...newContent, videoFile: e.target.files[0] })
+              }
+            />
+            <Button
+              className="w-full"
+              onClick={handleAddContent}
+              disabled={isUploading}
+            >
+              {isUploading ? "Uploading..." : "Save Lesson"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isReviewing} onOpenChange={setIsReviewing}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Write a Review</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label>Rating</Label>
+              <div className="flex gap-2">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    type="button"
+                    onClick={() => setReview({ ...review, rating: star })}
+                    className="focus:outline-none transition-transform hover:scale-110"
+                  >
+                    <Star
+                      className={`w-8 h-8 ${star <= review.rating ? "text-amber-500 fill-amber-500" : "text-muted"}`}
+                    />
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Comment</Label>
+              <Textarea
+                placeholder="Share your thoughts about this course..."
+                value={review.comment}
+                onChange={(e) =>
+                  setReview({ ...review, comment: e.target.value })
+                }
+                rows={4}
+              />
+            </div>
+            <Button
+              className="w-full"
+              onClick={() =>
+                addReviewMutation.mutate({
+                  courseId: parseInt(id),
+                  studentId: user.id,
+                  rating: review.rating,
+                  comment: review.comment,
+                })
+              }
+              disabled={addReviewMutation.isPending}
+            >
+              {addReviewMutation.isPending ? "Submitting..." : "Submit Review"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

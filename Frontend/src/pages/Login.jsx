@@ -27,7 +27,7 @@ const Login = () => {
       const userData = await login(email, password);
       toast({ title: "Welcome back!" });
       // Redirect based on role
-      if (userData?.role === "Administrator") {
+      if (userData?.role === "Admin") {
         navigate("/dashboard");
       } else if (userData?.role === "Student") {
         navigate("/");
@@ -75,14 +75,22 @@ const Login = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
+              <div className="flex justify-end">
+                <Link
+                  to="/forgot-password"
+                  className="text-xs text-primary hover:underline font-medium"
+                >
+                  Forgot Password?
+                </Link>
+              </div>
             </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? "Logging in..." : "Login"}
             </Button>
-          </form>
-        </CardContent>
-        <CardFooter className="flex flex-col space-y-2">
-          <p className="text-sm text-center text-muted-foreground">
+            </form>
+            </CardContent>
+            <CardFooter className="flex flex-col space-y-2">
+            <p className="text-sm text-center text-muted-foreground">
             Don't have an account?{" "}
             <Link
               to="/register"
@@ -90,17 +98,17 @@ const Login = () => {
             >
               Register
             </Link>
-          </p>
-          <p className="text-sm text-center text-muted-foreground">
-            Already have a confirmation code?{" "}
+            </p>
+            <p className="text-sm text-center text-muted-foreground">
+            Have a confirmation code?{" "}
             <Link
               to="/confirm-email"
               className="text-primary hover:underline font-medium"
             >
               Confirm Email
             </Link>
-          </p>
-        </CardFooter>
+            </p>
+            </CardFooter>
       </Card>
     </div>
   );

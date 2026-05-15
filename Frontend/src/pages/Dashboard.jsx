@@ -5,252 +5,308 @@ import api from "@/api/axios";
 import {
   BookOpen,
   GraduationCap,
-  Layout,
-  TrendingUp,
   Clock,
-  Sparkles,
-  BrainCircuit,
-  ArrowRight,
+  TrendingUp,
+  Award,
+  ChevronRight,
+  PlayCircle,
+  Calendar,
+  Users,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
+import { Badge } from "@/components/ui/badge";
+import { getFullUrl } from "@/lib/urlHelper";
 
 const Dashboard = () => {
   const { user } = useAuth();
 
-  const { data: response, isLoading: enrollmentsLoading } = useQuery({
-    queryKey: ["enrollments", "me"],
+  const { data: dashboardData, isLoading } = useQuery({
+    queryKey: ["student-dashboard"],
     queryFn: async () => {
-      const response = await api.get(`/Enrollment/ByStudent/${user.id}`);
-      return response.data;
-    },
-    enabled: !!user && user?.role === "Student",
-  });
-
-  const enrollments = response?.data || [];
-
-  const { data: statsResponse, isLoading: statsLoading } = useQuery({
-    queryKey: ["dashboard", "stats", "student"],
-    queryFn: async () => {
-      const response = await api.get("/Dashboard/StudentDashboard");
+      const response = await api.get("/Dashboards/StudentDashboard");
       return response.data;
     },
     enabled: !!user,
   });
 
-  const stats = statsResponse;
+  const stats = dashboardData?.stats || { totalCourses: 0, totalExams: 0 };
+  const rawMyCourses = dashboardData?.myCourses || [];
+  const myCourses = rawMyCourses.map((c) => ({
+    ...c,
+    progress: c.progress?.progressPercentage || 0,
+  }));
+  const availableExams = dashboardData?.availableExams || [];
+  const submittedExams = dashboardData?.submittedExams || [];
 
-  const statCards = [
-    {
-      title: "Enrolled Courses",
-      value: stats?.stats?.TotalCourses || 0,
-      icon: BookOpen,
-      color: "text-blue-500",
-    },
-    {
-      title: "Exams Submitted",
-      value: stats?.stats?.TotalExams || 0,
-      icon: GraduationCap,
-      color: "text-purple-500",
-    },
-    {
-      title: "Average Score",
-      value: "N/A",
-      icon: TrendingUp,
-      color: "text-green-500",
-    },
-  ];
-
-  const getProgressColor = (progress) => {
-    if (progress > 80) return "bg-green-500";
-    if (progress >= 50) return "bg-yellow-500";
-    return "bg-blue-500";
+  const getFullUrl = (path) => {
+    if (!path || path === "No Image Available") return "/placeholder.svg";
+    if (path.startsWith("http")) return path;
+    const baseUrl = api.defaults.baseURL.replace("/api", "");
+    return `${baseUrl}/Images/Course/${path.replace(/\\/g, "/")}`;
   };
 
   return (
-    <div className="space-y-8 animate-fade-in">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="space-y-8 animate-fade-in max-w-7xl mx-auto pb-12">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-foreground tracking-tight">
-            Welcome back, {user?.fullName || user?.username}!
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">
+            Welcome back,{" "}
+            <span className="text-primary">{user?.fullName || "Student"}</span>!
           </h1>
           <p className="text-muted-foreground mt-1">
-            Student • Ready to continue your learning journey?
+            Here's what's happening with your learning journey.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button
-            asChild
-            variant="outline"
-            className="border-primary/30 text-primary hover:bg-primary/5 shadow-sm"
-          >
-            <Link to="/dashboard/quizzes" className="flex items-center gap-2 font-bold">
-               <Sparkles className="w-4 h-4" /> AI Study Center
+        <Button
+          asChild
+          variant="gradient"
+          className="shadow-lg shadow-primary/20"
+        >
+          <Link to="/courses">Explore New Courses</Link>
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card className="border-none shadow-sm bg-gradient-to-br from-primary/10 to-primary/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-primary" />
+              Enrolled Courses
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-primary">
+              {stats.totalCourses}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-none shadow-sm bg-gradient-to-br from-green-500/10 to-green-500/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <GraduationCap className="w-4 h-4 text-green-500" />
+              Exams Completed
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-green-600">
+              {stats.totalExams}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-none shadow-sm bg-gradient-to-br from-amber-500/10 to-amber-500/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-amber-500" />
+              Active Exams
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-amber-600">
+              {availableExams.length}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-none shadow-sm bg-gradient-to-br from-purple-500/10 to-purple-500/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2 text-purple-600">
+              <TrendingUp className="w-4 h-4" />
+              Overall Progress
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-purple-600">
+              {myCourses.length > 0
+                ? Math.round(
+                    myCourses.reduce((acc, c) => acc + (c.progress || 0), 0) /
+                      myCourses.length,
+                  )
+                : 0}
+              %
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+              <PlayCircle className="w-6 h-6 text-primary" />
+              Current Courses
+            </h2>
+            <Link
+              to="/dashboard/my-courses"
+              className="text-sm text-primary font-medium hover:underline flex items-center gap-1"
+            >
+              View All <ChevronRight className="w-4 h-4" />
             </Link>
-          </Button>
-          <Button
-            asChild
-            variant="gradient"
-            className="shadow-lg shadow-primary/20"
-          >
-            <Link to="/courses">Browse More Courses</Link>
-          </Button>
-        </div>
-      </div>
-
-      {/* AI Hub Highlight */}
-      <Card className="bg-gradient-to-r from-primary/10 via-background to-primary/5 border-primary/20 shadow-lg overflow-hidden relative group">
-        <div className="absolute right-0 top-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
-           <BrainCircuit className="w-32 h-32 text-primary" />
-        </div>
-        <CardContent className="p-8">
-          <div className="flex flex-col md:flex-row items-center gap-6 relative z-10">
-            <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center text-primary-foreground shadow-xl shadow-primary/20">
-               <Sparkles className="w-8 h-8" />
-            </div>
-            <div className="flex-1 text-center md:text-left space-y-2">
-               <h2 className="text-2xl font-black tracking-tight">AI Smart Practice Hub</h2>
-               <p className="text-muted-foreground max-lg">
-                  Boost your grades with our AI. Generate personalized quizzes and assignments based on your actual course videos and progress.
-               </p>
-            </div>
-            <Button asChild size="lg" className="h-14 px-8 text-lg font-black group-hover:translate-x-1 transition-transform">
-               <Link to="/dashboard/quizzes">
-                 Launch AI Center <ArrowRight className="ml-2 w-5 h-5" />
-               </Link>
-            </Button>
           </div>
-        </CardContent>
-      </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {statCards.map((stat, i) => (
-          <Card
-            key={i}
-            className="hover:shadow-md transition-all duration-300 border-none shadow-sm"
-          >
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                {stat.title}
-              </CardTitle>
-              <stat.icon className={`w-5 h-5 ${stat.color}`} />
-            </CardHeader>
-            <CardContent>
-              {statsLoading ? (
-                <Skeleton className="h-9 w-20" />
-              ) : (
-                <div className="text-3xl font-bold">{stat.value}</div>
-              )}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold flex items-center gap-2">
-            <Layout className="w-5 h-5 text-primary" />
-            Recently Accessed
-          </h2>
-          <Link
-            to="/dashboard/my-courses"
-            className="text-sm font-medium text-primary hover:underline"
-          >
-            View All My Courses
-          </Link>
-        </div>
-
-        {enrollmentsLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Skeleton className="h-40 w-full rounded-2xl" />
-            <Skeleton className="h-40 w-full rounded-2xl" />
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {enrollments.length > 0 ? (
-              enrollments.slice(0, 4).map((enrollment) => (
+          <div className="grid gap-4">
+            {myCourses.length > 0 ? (
+              myCourses.slice(0, 3).map((course) => (
                 <Card
-                  key={enrollment.enrollmentId}
-                  className="overflow-hidden border-none shadow-md hover:shadow-lg transition-shadow group"
+                  key={course.courseId}
+                  className="overflow-hidden border-none shadow-sm hover:shadow-md transition-all group"
                 >
-                  <CardContent className="p-6">
-                    <div className="flex justify-between items-start mb-6">
-                      <div className="space-y-1">
-                        <h3 className="font-bold text-lg group-hover:text-primary transition-colors line-clamp-1">
-                          {enrollment.courseTitle}
-                        </h3>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <span className="font-medium text-foreground">
-                            {enrollment.instructorName}
+                  <div className="flex flex-col md:flex-row">
+                    <div className="w-full md:w-48 h-32 relative overflow-hidden">
+                      <img
+                        src={getFullUrl(course.image)}
+                        alt={course.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                      <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors" />
+                    </div>
+                    <CardContent className="flex-1 p-5">
+                      <div className="flex justify-between items-start gap-4">
+                        <div className="space-y-1">
+                          <Badge variant="secondary" className="mb-2">
+                            {course.categoryName}
+                          </Badge>
+                          <h3 className="font-bold text-lg leading-tight group-hover:text-primary transition-colors">
+                            {course.title}
+                          </h3>
+                          <p className="text-sm text-muted-foreground flex items-center gap-1">
+                            <Users className="w-3 h-3" /> By{" "}
+                            {course.instructorName}
+                          </p>
+                        </div>
+                        <Button
+                          asChild
+                          size="sm"
+                          className="rounded-full shadow-md"
+                        >
+                          <Link to={`/courses/${course.courseId}`}>
+                            Continue
+                          </Link>
+                        </Button>
+                      </div>
+                      <div className="mt-4 space-y-2">
+                        <div className="flex justify-between text-xs font-medium">
+                          <span className="text-muted-foreground">
+                            Progress
                           </span>
-                          <span>•</span>
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3" /> Last accessed today
+                          <span className="text-primary">
+                            {course.progress}%
                           </span>
                         </div>
+                        <div className="h-2 w-full bg-primary/10 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-primary transition-all duration-500"
+                            style={{ width: `${course.progress}%` }}
+                          />
+                        </div>
                       </div>
-                      <Badge
-                        className={`h-6 ${
-                          enrollment.progress > 80 
-                            ? "bg-green-500" 
-                            : enrollment.progress >= 50 
-                            ? "bg-yellow-500" 
-                            : "bg-blue-500"
-                        }`}
-                      >
-                        {enrollment.progress === 100 ? "Done" : "Active"}
-                      </Badge>
-                    </div>
-                    <div className="space-y-3">
-                      <div className="flex justify-between text-xs font-bold uppercase text-muted-foreground">
-                        <span>Course Progress</span>
-                        <span className="text-primary">
-                          {enrollment.progress}%
-                        </span>
-                      </div>
-                      <div className="h-2 w-full bg-primary/10 rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full transition-all duration-500 ${getProgressColor(enrollment.progress)}`}
-                          style={{ width: `${enrollment.progress}%` }}
-                        />
-                      </div>
-                    </div>
-                    <Button asChild className="w-full mt-6" variant="outline">
-                      <Link
-                        to={`/dashboard/courses/${enrollment.courseId}`}
-                      >
-                        Continue Learning
-                      </Link>
-                    </Button>
-                  </CardContent>
+                    </CardContent>
+                  </div>
                 </Card>
               ))
             ) : (
-              <Card className="md:col-span-2 border-2 border-dashed bg-transparent">
-                <CardContent className="p-16 text-center space-y-4">
-                  <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto">
-                    <BookOpen className="w-8 h-8 text-muted-foreground" />
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="text-xl font-bold text-foreground">
-                      No active enrollments
-                    </h3>
-                    <p className="text-muted-foreground max-w-xs mx-auto">
-                      Start your learning journey by exploring our wide range of
-                      expert-led courses.
-                    </p>
-                  </div>
-                  <Button asChild className="mt-4">
+              <Card className="border-dashed border-2 p-12 text-center">
+                <CardContent className="space-y-4">
+                  <BookOpen className="w-12 h-12 mx-auto text-muted-foreground/30" />
+                  <p className="text-muted-foreground font-medium">
+                    You haven't enrolled in any courses yet.
+                  </p>
+                  <Button asChild variant="outline">
                     <Link to="/courses">Explore Courses</Link>
                   </Button>
                 </CardContent>
               </Card>
             )}
           </div>
-        )}
+        </div>
+
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+              <GraduationCap className="w-6 h-6 text-primary" />
+              Exams
+            </h2>
+          </div>
+
+          <Card className="border-none shadow-sm overflow-hidden">
+            <CardHeader className="bg-primary/5 border-b py-4">
+              <CardTitle className="text-sm font-bold flex items-center gap-2">
+                <Clock className="w-4 h-4 text-primary" />
+                Available Assessments
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y">
+                {availableExams.length > 0 ? (
+                  availableExams.map((exam) => (
+                    <div
+                      key={exam.examId}
+                      className="p-4 hover:bg-muted/50 transition-colors flex items-center justify-between group"
+                    >
+                      <div className="space-y-1">
+                        <p className="font-bold text-sm leading-tight group-hover:text-primary transition-colors">
+                          {exam.title}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+                          {exam.courseTitle}
+                        </p>
+                      </div>
+                      <Button
+                        asChild
+                        size="sm"
+                        variant="outline"
+                        className="h-8 rounded-full"
+                      >
+                        <Link to={`/dashboard/exam/${exam.examId}`}>Start</Link>
+                      </Button>
+                    </div>
+                  ))
+                ) : (
+                  <div className="p-8 text-center text-xs text-muted-foreground">
+                    No upcoming exams.
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-none shadow-sm overflow-hidden">
+            <CardHeader className="bg-green-500/5 border-b py-4">
+              <CardTitle className="text-sm font-bold flex items-center gap-2 text-green-600">
+                <Award className="w-4 h-4" />
+                Recent Results
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y">
+                {submittedExams.length > 0 ? (
+                  submittedExams.map((result, idx) => (
+                    <div
+                      key={idx}
+                      className="p-4 flex items-center justify-between"
+                    >
+                      <p className="font-bold text-sm">{result.examTitle}</p>
+                      <div className="text-center">
+                        <p className="text-lg font-bold text-green-600 leading-none">
+                          {result.score}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground font-bold uppercase">
+                          Score
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="p-8 text-center text-xs text-muted-foreground">
+                    Complete your first exam to see results.
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

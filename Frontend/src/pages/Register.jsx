@@ -20,35 +20,51 @@ import {
 } from "@/components/ui/select";
 
 const Register = () => {
-  const [name, setName] = useState("");
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("Student");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const { register } = useAuth(); // شلنا user لأننا مش محتاجينه هنا حالياً
+  const { register } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (password !== confirmPassword) {
+      return toast({
+        variant: "destructive",
+        title: "Registration failed",
+        description: "Passwords do not match",
+      });
+    }
+
     setIsLoading(true);
     try {
-      // عملية التسجيل في الباك-إند بتبعت إيميل التأكيد أوتوماتيكياً
-      await register(name, email, password, role);
+      await register(fullName, email, password, confirmPassword);
 
       toast({
         title: "Registration successful!",
-        description: "Please check your email for the confirmation code.",
+        description: "Please check your email to confirm your account.",
       });
 
-      // توجيه المستخدم لصفحة التأكيد مع تمرير الإيميل كـ state
-      // عشان صفحة الـ ConfirmEmail تقدر تسحب الإيميل وتعرضه للمستخدم
       navigate("/confirm-email", { state: { email } });
     } catch (error) {
+      console.error("Registration Error:", error.response?.data);
+      
+      // Handle ModelState errors from ASP.NET
+      let errorMsg = "Something went wrong";
+      if (typeof error.response?.data === 'object') {
+        const errors = error.response.data;
+        errorMsg = Object.values(errors).flat().join(". ");
+      } else if (typeof error.response?.data === 'string') {
+        errorMsg = error.response.data;
+      }
+
       toast({
         variant: "destructive",
         title: "Registration failed",
-        description: error.response?.data?.message || "Something went wrong",
+        description: errorMsg,
       });
     } finally {
       setIsLoading(false);
@@ -71,8 +87,8 @@ const Register = () => {
             <div className="space-y-2">
               <Input
                 placeholder="Full Name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
                 required
               />
             </div>
@@ -95,15 +111,13 @@ const Register = () => {
               />
             </div>
             <div className="space-y-2">
-              <Select value={role} onValueChange={setRole}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Student">Student</SelectItem>
-                  <SelectItem value="Instructor">Instructor</SelectItem>
-                </SelectContent>
-              </Select>
+              <Input
+                type="password"
+                placeholder="Confirm Password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+              />
             </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? "Creating account..." : "Register"}

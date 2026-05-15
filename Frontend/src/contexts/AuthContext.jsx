@@ -28,21 +28,24 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     const response = await api.post("/Account/Login", { email, password });
     const { accessToken, refreshToken } = response.data;
-    
+
     localStorage.setItem("token", accessToken);
     localStorage.setItem("refreshToken", refreshToken);
 
-    // After login, fetch the profile to get user details and role
     try {
       const profileResponse = await api.get("/Account/Account/GetProfile");
       const userData = profileResponse.data.data;
-      
-      const rawRole = userData.roles && userData.roles.length > 0 ? userData.roles[0] : "Student";
-      
-      const userWithRole = { 
+
+      const rawRole =
+        userData.roles && userData.roles.length > 0
+          ? userData.roles[0]
+          : "Student";
+
+      const userWithRole = {
         ...userData,
-        id: userData.userId, // Map backend UserId to id
-        role: rawRole === "Admin" ? "Administrator" : rawRole
+        id: userData.userId,
+        emailConfirmed: userData.emailConfirmed,
+        role: rawRole,
       };
 
       localStorage.setItem("user", JSON.stringify(userWithRole));
@@ -50,32 +53,49 @@ export const AuthProvider = ({ children }) => {
       return userWithRole;
     } catch (error) {
       console.error("Failed to fetch profile after login", error);
-      // Even if profile fetch fails, we have tokens, but frontend needs user info
       throw error;
     }
   };
 
-  const register = async (name, email, password) => {
+  const register = async (name, email, password, confirmPassword) => {
     const response = await api.post("/Account/Register", {
       fullName: name,
       email: email,
       password: password,
-      confirmPassword: password
+      confirmPassword: confirmPassword || password,
     });
     return response.data;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    const refreshToken = localStorage.getItem("refreshToken");
+    if (refreshToken) {
+      try {
+        await api.post(`/Account/Logout?refreshToken=${refreshToken}`);
+      } catch (error) {
+        console.error("Failed to logout from server", error);
+      }
+    }
     localStorage.removeItem("token");
+    localStorage.removeItem("refreshToken");
     localStorage.removeItem("user");
     setUser(null);
   };
 
   const updateProfile = async (data) => {
-    const response = await api.put("/Account/Account/UpdateProfile", data);
-    const updatedUser = response.data;
+    const payload = {
+      fullName: data.fullName || data.name,
+    };
+    const response = await api.put("/Account/Account/UpdateProfile", payload);
+    const updatedProfile = response.data.data;
     const currentUser = JSON.parse(localStorage.getItem("user"));
-    const newUser = { ...currentUser, ...updatedUser };
+    const newUser = {
+      ...currentUser,
+      fullName: updatedProfile.fullName,
+      id: updatedProfile.userId,
+      emailConfirmed:
+        updatedProfile.emailConfirmed ?? currentUser.emailConfirmed,
+    };
     localStorage.setItem("user", JSON.stringify(newUser));
     setUser(newUser);
     return newUser;
@@ -98,4 +118,10 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
+};

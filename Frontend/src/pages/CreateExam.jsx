@@ -22,30 +22,36 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
 import api from "@/api/axios";
+import examService from "@/api/exam";
 import { useAuth } from "@/contexts/AuthContext";
 import { Plus, Trash2, Loader2, BookOpen, Clock, Target, Sparkles, BrainCircuit } from "lucide-react";
-import { Separator } from "@/components/ui/separator";
 
 // Form Schema
 const formSchema = z.object({
-  courseId: z.string().min(1, "Please select a course"),
+  courseId: z.preprocess((val) => Number(val), z.number().min(1, "Please select a course")),
   title: z.string().min(2, "Title must be at least 2 characters"),
   description: z.string().min(10, "Description must be at least 10 characters"),
-  duration: z.string().min(1, "Duration is required"),
-  status: z.enum(["Draft", "Published"]),
+  durationInMinutes: z.preprocess((val) => Number(val), z.number().min(1, "Duration is required")),
+  examDate: z.string().min(1, "Exam date is required"),
+  endDate: z.string().min(1, "End date is required"),
   totalMarks: z.preprocess(
     (val) => Number(val),
     z.number().positive("Total marks must be positive")
   ),
   questions: z.array(
     z.object({
-      text: z.string().min(1, "Question text is required"),
-      type: z.enum(["Multiple Choice"]),
-      options: z.array(z.string().min(1, "Option cannot be empty")).min(2, "At least 2 options required"),
-      correctAnswer: z.string().min(1, "Correct answer is required"),
+      questionText: z.string().min(1, "Question text is required"),
+      questionType: z.preprocess((val) => Number(val), z.number()), // 0 for MCQ based on Enum
+      marks: z.preprocess((val) => Number(val), z.number().min(1)),
+      order: z.number(),
+      options: z.array(
+        z.object({
+          optionText: z.string().min(1, "Option text is required"),
+          isCorrect: z.boolean(),
+        })
+      ).min(2, "At least 2 options required"),
     })
   ).min(1, "At least one question is required"),
 });
@@ -62,18 +68,23 @@ const CreateExam = () => {
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      courseId: "",
+      courseId: 0,
       title: "",
       description: "",
-      duration: "30",
-      status: "Draft",
+      durationInMinutes: 30,
+      examDate: new Date().toISOString().split('T')[0],
+      endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       totalMarks: 100,
       questions: [
         {
-          text: "",
-          type: "Multiple Choice",
-          options: ["", ""],
-          correctAnswer: "",
+          questionText: "",
+          questionType: 0,
+          marks: 10,
+          order: 1,
+          options: [
+            { optionText: "", isCorrect: false },
+            { optionText: "", isCorrect: false },
+          ],
         },
       ],
     },
@@ -88,8 +99,8 @@ const CreateExam = () => {
   useEffect(() => {
     const fetchCourses = async () => {
       try {
-        const response = await api.get("/Course/mine");
-        setCourses(response.data);
+        const response = await api.get("/Course/MyCourses");
+        setCourses(response.data.data || []);
       } catch (error) {
         toast({
           title: "Error",
@@ -116,27 +127,34 @@ const CreateExam = () => {
 
     setIsGenerating(true);
     try {
-      const response = await api.post("/AI-Assessment/generate", {
+      const response = await examService.generateAIExam(
         courseId,
-        type: "Exam",
-        count: aiCount,
-      });
+        form.getValues("examDate"),
+        form.getValues("durationInMinutes"),
+        {
+          topic: form.getValues("title") || "General Course Content",
+          numberOfQuestions: aiCount,
+          questionTypes: ["MCQ"],
+          difficulty: "Medium"
+        }
+      );
 
-      const { assessment } = response.data;
+      const { data } = response;
       
-      const newQuestions = assessment.questions.map(q => ({
-        text: q.text,
-        type: "Multiple Choice",
-        options: q.options,
-        correctAnswer: q.correctAnswer
+      const newQuestions = data.questions.map((q, idx) => ({
+        questionText: q.questionText,
+        questionType: 0,
+        marks: q.marks || 10,
+        order: idx + 1,
+        options: q.options.map(o => ({
+          optionText: o.optionText,
+          isCorrect: o.isCorrect
+        }))
       }));
 
       form.setValue("questions", newQuestions);
       if (!form.getValues("title")) {
-        form.setValue("title", assessment.title);
-      }
-      if (!form.getValues("description")) {
-        form.setValue("description", "AI-Generated comprehensive assessment based on course materials.");
+        form.setValue("title", data.title);
       }
       
       toast({
@@ -157,16 +175,20 @@ const CreateExam = () => {
 
   const addQuestion = () => {
     append({
-      text: "",
-      type: "Multiple Choice",
-      options: ["", ""],
-      correctAnswer: "",
+      questionText: "",
+      questionType: 0,
+      marks: 10,
+      order: fields.length + 1,
+      options: [
+        { optionText: "", isCorrect: false },
+        { optionText: "", isCorrect: false },
+      ],
     });
   };
 
   const addOption = (questionIndex) => {
     const currentOptions = form.getValues(`questions.${questionIndex}.options`);
-    form.setValue(`questions.${questionIndex}.options`, [...currentOptions, ""]);
+    form.setValue(`questions.${questionIndex}.options`, [...currentOptions, { optionText: "", isCorrect: false }]);
   };
 
   const removeOption = (questionIndex, optionIndex) => {
@@ -174,18 +196,13 @@ const CreateExam = () => {
     if (currentOptions.length > 2) {
       const newOptions = currentOptions.filter((_, i) => i !== optionIndex);
       form.setValue(`questions.${questionIndex}.options`, newOptions);
-
-      const correctAnswer = form.getValues(`questions.${questionIndex}.correctAnswer`);
-      if (correctAnswer === currentOptions[optionIndex]) {
-        form.setValue(`questions.${questionIndex}.correctAnswer`, "");
-      }
     }
   };
 
   const onSubmit = async (values) => {
     setIsSubmitting(true);
     try {
-      await api.post("/Exam", values);
+      await examService.create(values);
       toast({
         title: "Success!",
         description: "Exam created successfully",
@@ -268,7 +285,7 @@ const CreateExam = () => {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Course</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Select onValueChange={field.onChange} value={String(field.value)}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select course" />
@@ -276,7 +293,7 @@ const CreateExam = () => {
                         </FormControl>
                         <SelectContent>
                           {courses.map((course) => (
-                            <SelectItem key={course._id} value={course._id}>
+                            <SelectItem key={course.courseId} value={String(course.courseId)}>
                               {course.title}
                             </SelectItem>
                           ))}
@@ -316,10 +333,39 @@ const CreateExam = () => {
                 )}
               />
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField
                   control={form.control}
-                  name="duration"
+                  name="examDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Start Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="endDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>End Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FormField
+                  control={form.control}
+                  name="durationInMinutes"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="flex items-center gap-2">
@@ -343,28 +389,6 @@ const CreateExam = () => {
                       <FormControl>
                         <Input type="number" min="1" {...field} />
                       </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="status"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Status</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="Draft">Draft</SelectItem>
-                          <SelectItem value="Published">Published</SelectItem>
-                        </SelectContent>
-                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -408,7 +432,7 @@ const CreateExam = () => {
                   <CardContent className="space-y-4">
                     <FormField
                       control={form.control}
-                      name={`questions.${questionIndex}.text`}
+                      name={`questions.${questionIndex}.questionText`}
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Question Text</FormLabel>
@@ -437,10 +461,26 @@ const CreateExam = () => {
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {form.watch(`questions.${questionIndex}.options`).map((_, optionIndex) => (
-                          <div key={optionIndex} className="flex gap-2">
+                          <div key={optionIndex} className="flex gap-2 items-center">
                             <FormField
                               control={form.control}
-                              name={`questions.${questionIndex}.options.${optionIndex}`}
+                              name={`questions.${questionIndex}.options.${optionIndex}.isCorrect`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormControl>
+                                    <input 
+                                      type="checkbox" 
+                                      checked={field.value} 
+                                      onChange={field.onChange}
+                                      className="w-4 h-4 text-primary"
+                                    />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name={`questions.${questionIndex}.options.${optionIndex}.optionText`}
                               render={({ field }) => (
                                 <FormItem className="flex-1">
                                   <FormControl>
@@ -465,33 +505,6 @@ const CreateExam = () => {
                         ))}
                       </div>
                     </div>
-
-                    <FormField
-                      control={form.control}
-                      name={`questions.${questionIndex}.correctAnswer`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-primary font-bold">Correct Answer</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger className="border-primary/30">
-                                <SelectValue placeholder="Select correct answer" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {form.watch(`questions.${questionIndex}.options`).map((option, idx) => (
-                                option && (
-                                  <SelectItem key={idx} value={option}>
-                                    {option}
-                                  </SelectItem>
-                                )
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
                   </CardContent>
                 </Card>
               ))}

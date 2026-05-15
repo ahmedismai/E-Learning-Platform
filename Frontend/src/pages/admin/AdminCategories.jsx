@@ -18,6 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Plus, Pencil, Trash2, Layers } from "lucide-react";
 import api from "@/api/axios";
+import categoryService from "@/api/category";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -37,13 +38,19 @@ const AdminCategories = () => {
   const [editingCategory, setEditingCategory] = useState(null);
   const [formData, setFormData] = useState({ name: "", description: "", image: null });
 
-  const { data: categories = [], isLoading } = useQuery({
+  const getFullUrl = (path) => {
+    if (!path || path === "No Image Available") return "";
+    if (path.startsWith("http")) return path;
+    const baseUrl = api.defaults.baseURL.replace("/api", "");
+    return `${baseUrl}/Images/Category/${path.replace(/\\/g, "/")}`;
+  };
+
+  const { data: response, isLoading } = useQuery({
     queryKey: ["admin", "categories"],
-    queryFn: async () => {
-      const response = await api.get("/Category");
-      return response.data.data || [];
-    },
+    queryFn: () => categoryService.getAll(),
   });
+
+  const categories = response?.data || [];
 
   const categoryMutation = useMutation({
     mutationFn: async (data) => {
@@ -53,9 +60,9 @@ const AdminCategories = () => {
       if (data.image) fd.append("ImgURL", data.image);
 
       if (editingCategory) {
-        return await api.patch(`/Category/${editingCategory.categoryId}`, fd);
+        return await categoryService.update(editingCategory.categoryId, fd);
       }
-      return await api.post("/Category", fd);
+      return await categoryService.create(fd);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["admin", "categories"]);
@@ -68,11 +75,12 @@ const AdminCategories = () => {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id) => await api.delete(`/Category/${id}`),
+    mutationFn: (id) => categoryService.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries(["admin", "categories"]);
       toast.success("Category deleted");
     },
+    onError: (error) => toast.error(error.response?.data?.message || "Error"),
   });
 
   if (isLoading) return <Skeleton className="h-60 w-full" />;
@@ -158,7 +166,7 @@ const AdminCategories = () => {
                   <TableCell>
                     {cat.imgPath ? (
                       <img 
-                        src={`${api.defaults.baseURL.replace('/api', '')}/${cat.imgPath.replace(/\\/g, '/')}`} 
+                        src={getFullUrl(cat.imgPath)} 
                         alt={cat.categoryName} 
                         className="w-10 h-10 rounded-full object-cover"
                       />
@@ -198,6 +206,13 @@ const AdminCategories = () => {
                   </TableCell>
                 </TableRow>
               ))}
+              {categories.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center py-10 text-muted-foreground italic">
+                    No categories found.
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>

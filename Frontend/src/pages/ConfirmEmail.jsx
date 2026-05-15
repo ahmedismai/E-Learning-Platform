@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
-import api from "@/api/axios";
+import accountService from "@/api/account";
 import { useAuth } from "@/contexts/AuthContext";
 
 const ConfirmEmail = () => {
@@ -15,7 +15,6 @@ const ConfirmEmail = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { login } = useAuth();
   const location = useLocation();
 
   useEffect(() => {
@@ -35,10 +34,10 @@ const ConfirmEmail = () => {
   useEffect(() => {
     const token = searchParams.get("token");
     const queryEmail = searchParams.get("email");
-    if (token && queryEmail && email && code) {
+    const userId = searchParams.get("userId");
+    
+    if (token && userId && email && code) {
       handleConfirm();
-    } else if (token && !queryEmail) {
-      handleConfirmTokenOnly(token);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, email, code]);
@@ -53,48 +52,46 @@ const ConfirmEmail = () => {
     if (!userId || !token) {
       return toast({
         variant: "destructive",
-        title: "يرجى استخدام رابط التأكيد المرسل إليك",
+        title: "Missing Information",
+        description: "Please use the confirmation link sent to your email.",
       });
     }
     setIsLoading(true);
     try {
-      await api.get(`/Account/ConfirmEmail?userId=${userId}&token=${token}`);
+      await accountService.confirmEmail(userId, token);
       
-      toast({ title: "تم تأكيد البريد بنجاح! يمكنك الآن تسجيل الدخول" });
+      toast({ title: "Email confirmed successfully! You can now login." });
       navigate("/login");
     } catch (error) {
       toast({
         variant: "destructive",
-        title: "فشل التأكيد",
+        title: "Confirmation failed",
         description:
-          error.response?.data || "حدث خطأ أثناء التحقق من الكود",
+          error.response?.data || "An error occurred during verification.",
       });
     } finally {
       setIsLoading(false);
     }
   }
 
-  async function handleConfirmTokenOnly(tokenOnly) {
-    // This is handled by handleConfirm now
-  }
-
   const handleResend = async () => {
     if (!email) {
       return toast({
         variant: "destructive",
-        title: "يرجى إدخال البريد لإعادة الإرسال",
+        title: "Email Required",
+        description: "Please enter your email to resend the code.",
       });
     }
     setIsResending(true);
     try {
-      await api.post("/Account/ResendConfirmEmail", { email });
-      toast({ title: "تم إرسال الكود مرة أخرى إلى بريدك" });
+      await accountService.resendConfirmEmail(email);
+      toast({ title: "Confirmation email has been resent." });
     } catch (error) {
       toast({
         variant: "destructive",
-        title: "فشل إرسال الكود",
+        title: "Failed to resend",
         description:
-          error.response?.data?.message || "لم نتمكن من إرسال الكود الآن",
+          error.response?.data?.message || "Could not resend confirmation email.",
       });
     } finally {
       setIsResending(false);
@@ -106,10 +103,10 @@ const ConfirmEmail = () => {
       <Card className="w-full max-w-md animate-scale-in">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">
-            تأكيد البريد الإلكتروني
+            Confirm Your Email
           </CardTitle>
           <p className="text-muted-foreground text-center">
-            أدخل بريدك الإلكترونى والكود الذى وصلك على الجيميل.
+            Enter your email and the code sent to your inbox.
           </p>
         </CardHeader>
         <CardContent>
@@ -117,32 +114,34 @@ const ConfirmEmail = () => {
             <div className="space-y-2">
               <Input
                 type="email"
-                placeholder="البريد الإلكتروني"
+                placeholder="Email Address"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                required
               />
             </div>
             <div className="space-y-2">
               <Input
                 type="text"
-                placeholder="كود التفعيل"
+                placeholder="Confirmation Token"
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
+                required
               />
             </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "جاري التأكيد..." : "تأكيد البريد"}
+              {isLoading ? "Verifying..." : "Confirm Email"}
             </Button>
           </form>
           <div className="mt-4 text-center">
-            <p className="text-sm text-muted-foreground mb-3">لم يصل الكود؟</p>
+            <p className="text-sm text-muted-foreground mb-3">Didn't receive a code?</p>
             <Button
               variant="outline"
               className="w-full"
               onClick={handleResend}
               disabled={isResending}
             >
-              {isResending ? "جاري الإرسال..." : "إعادة إرسال الكود"}
+              {isResending ? "Resending..." : "Resend Confirmation Email"}
             </Button>
           </div>
         </CardContent>

@@ -13,22 +13,25 @@ const Grades = () => {
   const [expandedGrade, setExpandedGrade] = useState(null);
 
   const {
-    data: grades = [],
+    data: dashboardData,
     isLoading,
     isError,
   } = useQuery({
-    queryKey: ["grades", "me"],
+    queryKey: ["student", "dashboard"],
     queryFn: async () => {
-      const response = await api.get("/Grade/me");
+      const response = await api.get("/Dashboards/StudentDashboard");
       return response.data;
     },
     enabled: user?.role === "Student",
   });
 
+  const grades = dashboardData?.submittedExams || [];
+  const stats = dashboardData?.stats || { totalCourses: 0, totalExams: 0 };
+
   const overallGrade =
     grades.length > 0
       ? Math.round(
-          grades.reduce((sum, g) => sum + (g.percentage || 0), 0) /
+          grades.reduce((sum, g) => sum + (g.score || 0), 0) /
             grades.length,
         )
       : 0;
@@ -137,59 +140,40 @@ const Grades = () => {
       {/* Detailed Grades */}
       <Card>
         <CardHeader>
-          <CardTitle>All Grades</CardTitle>
+          <CardTitle>All Assessment Results</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             {grades.length > 0 ? (
-              grades.map((grade) => (
-                <div key={grade._id} className="space-y-2">
+              grades.map((grade, index) => (
+                <div key={index} className="space-y-2">
                   <div
-                    className="flex items-center justify-between p-4 rounded-lg bg-secondary/30 cursor-pointer hover:bg-secondary/50 transition-colors"
-                    onClick={() => setExpandedGrade(expandedGrade === grade._id ? null : grade._id)}
+                    className="flex items-center justify-between p-4 rounded-lg bg-secondary/30"
                   >
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-1">
-                        <Badge variant="muted">{grade.type}</Badge>
+                        <Badge variant="muted">Final Exam</Badge>
                         <h4 className="font-semibold text-foreground">
-                          {grade.quizId?.title || grade.examId?.title || grade.assignmentId?.title || "Assessment"}
+                          {grade.examTitle}
                         </h4>
                       </div>
-                      <p className="text-sm text-muted-foreground">
-                        {grade.courseId?.title || "Course"} • Graded on{" "}
-                        {new Date(grade.createdAt).toLocaleDateString()}
-                      </p>
                     </div>
                     <div className="flex items-center gap-6">
                       <div className="text-right">
                         <Badge
-                          variant={getGradeColor(grade.percentage || 0)}
+                          variant={getGradeColor(grade.score || 0)}
                           className="text-lg px-3 py-1"
                         >
-                          {grade.score}/{grade.maxScore}
+                          {grade.score}%
                         </Badge>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {grade.percentage}%
-                        </p>
                       </div>
-                      {expandedGrade === grade._id ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
                     </div>
                   </div>
-                  
-                  {expandedGrade === grade._id && (
-                    <div className="px-4 pb-4 animate-in slide-in-from-top-2 duration-300">
-                       <AIFeedback 
-                         gradeId={grade._id} 
-                         initialFeedback={grade.aiFeedback} 
-                         isReviewed={grade.isReviewed}
-                       />
-                    </div>
-                  )}
                 </div>
               ))
             ) : (
               <div className="text-center py-12">
-                <p className="text-muted-foreground">No grades available yet</p>
+                <p className="text-muted-foreground">No assessment results available yet</p>
               </div>
             )}
           </div>
