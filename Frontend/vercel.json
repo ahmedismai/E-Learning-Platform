@@ -1,6 +1,10 @@
 {
     "rewrites": [
         {
+            "source": "/api/:path*",
+            "destination": "http://e-learning-platform-3.runasp.net/api/:path*"
+        },
+        {
             "source": "/(.*)",
             "destination": "/index.html"
         }
