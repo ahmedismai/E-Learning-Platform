@@ -33,7 +33,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem("refreshToken", refreshToken);
 
     try {
-      const profileResponse = await api.get("/api/Account/GetProfile");
+      const profileResponse = await api.get("/api/Account/Account/GetProfile");
       const userData = profileResponse.data.data;
 
       const rawRole =
@@ -86,7 +86,7 @@ export const AuthProvider = ({ children }) => {
     const payload = {
       fullName: data.fullName || data.name,
     };
-    const response = await api.put("/api/Account/UpdateProfile", payload);
+    const response = await api.put("/api/Account/Account/UpdateProfile", payload);
     const updatedProfile = response.data.data;
     const currentUser = JSON.parse(localStorage.getItem("user"));
     const newUser = {
