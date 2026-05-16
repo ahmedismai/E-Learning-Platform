@@ -44,7 +44,7 @@ const AdminDashboard = () => {
   const { data: dashboardData, isLoading: isDashLoading } = useQuery({
     queryKey: ["admin-dashboard"],
     queryFn: async () => {
-      const response = await api.get("/Dashboards/AdminDashboard");
+      const response = await api.get("/api/Dashboards/AdminDashboard");
       return response.data;
     },
   });

@@ -79,11 +79,11 @@ const Assignments = ({ isSubComponent = false }) => {
   } = useQuery({
     queryKey: ["assignments", user?.role],
     queryFn: async () => {
-      const response = await api.get("/Assignment");
+      const response = await api.get("/api/Assignment");
       const allAssignments = response.data;
 
       // For students, we only want assignments from courses they are enrolled in
-      const enrollmentsRes = await api.get("/Enrollment/me");
+      const enrollmentsRes = await api.get("/api/Enrollment/me");
       const enrollments = enrollmentsRes.data;
       const enrolledCourseIds = enrollments.map(e => (e.courseId?._id || e.courseId).toString());
 
@@ -114,7 +114,7 @@ const Assignments = ({ isSubComponent = false }) => {
       if (isInstructor) return { message: "Instructor preview" };
       const formData = new FormData();
       formData.append("file", file);
-      return await api.post(`/Assignment/${assignmentId}/submit`, formData, {
+      return await api.post(`/api/Assignment/${assignmentId}/submit`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
     },

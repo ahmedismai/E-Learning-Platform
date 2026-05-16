@@ -2,32 +2,32 @@ import api from "./axios";
 
 const roleService = {
   getAll: async () => {
-    const response = await api.get("/Role");
+    const response = await api.get("/api/Role");
     return response.data;
   },
 
   create: async (roleName) => {
-    const response = await api.post(`/Role/${roleName}`);
+    const response = await api.post(`/api/Role/${roleName}`);
     return response.data;
   },
 
   delete: async (roleName) => {
-    const response = await api.delete(`/Role/${roleName}`);
+    const response = await api.delete(`/api/Role/${roleName}`);
     return response.data;
   },
 
   assignRole: async (userId, roleName) => {
-    const response = await api.post(`/Role/AssignRole/${userId}/${roleName}`);
+    const response = await api.post(`/api/Role/AssignRole/${userId}/${roleName}`);
     return response.data;
   },
 
   unassignRole: async (userId, roleName) => {
-    const response = await api.delete(`/Role/UnAssignRole/${userId}/${roleName}`);
+    const response = await api.delete(`/api/Role/UnAssignRole/${userId}/${roleName}`);
     return response.data;
   },
 
   removeAllRoles: async (userId) => {
-    const response = await api.delete(`/Role/RemoveAllRoles/${userId}`);
+    const response = await api.delete(`/api/Role/RemoveAllRoles/${userId}`);
     return response.data;
   },
 };
