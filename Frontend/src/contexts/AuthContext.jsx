@@ -26,14 +26,14 @@ export const AuthProvider = ({ children }) => {
   const isAuthenticated = !!user;
 
   const login = async (email, password) => {
-    const response = await api.post("/Account/Login", { email, password });
+    const response = await api.post("/api/Account/Login", { email, password });
     const { accessToken, refreshToken } = response.data;
 
     localStorage.setItem("token", accessToken);
     localStorage.setItem("refreshToken", refreshToken);
 
     try {
-      const profileResponse = await api.get("/Account/Account/GetProfile");
+      const profileResponse = await api.get("/api/Account/GetProfile");
       const userData = profileResponse.data.data;
 
       const rawRole =
@@ -58,7 +58,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const register = async (name, email, password, confirmPassword) => {
-    const response = await api.post("/Account/Register", {
+    const response = await api.post("/api/Account/Register", {
       fullName: name,
       email: email,
       password: password,
@@ -71,7 +71,7 @@ export const AuthProvider = ({ children }) => {
     const refreshToken = localStorage.getItem("refreshToken");
     if (refreshToken) {
       try {
-        await api.post(`/Account/Logout?refreshToken=${refreshToken}`);
+        await api.post(`/api/Account/Logout?refreshToken=${refreshToken}`);
       } catch (error) {
         console.error("Failed to logout from server", error);
       }
@@ -86,7 +86,7 @@ export const AuthProvider = ({ children }) => {
     const payload = {
       fullName: data.fullName || data.name,
     };
-    const response = await api.put("/Account/Account/UpdateProfile", payload);
+    const response = await api.put("/api/Account/UpdateProfile", payload);
     const updatedProfile = response.data.data;
     const currentUser = JSON.parse(localStorage.getItem("user"));
     const newUser = {
