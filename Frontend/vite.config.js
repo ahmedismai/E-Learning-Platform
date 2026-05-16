@@ -9,7 +9,7 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
     proxy: {
       "/api": {
-        target: "http://e-learning-platform-3.runasp.net/",
+        target: "http://e-learning-platform-3.runasp.net/api",
         changeOrigin: true,
       },
     },
