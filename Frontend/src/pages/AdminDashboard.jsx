@@ -30,8 +30,6 @@ import {
   Clock,
   Star,
   Trash2,
-  Edit,
-  UserPlus
 } from "lucide-react";
 import enrollmentService from "@/api/enrollment";
 import courseService from "@/api/course";
@@ -41,6 +39,7 @@ const AdminDashboard = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Fetch Dashboard general stats
   const { data: dashboardData, isLoading: isDashLoading } = useQuery({
     queryKey: ["admin-dashboard"],
     queryFn: async () => {
@@ -75,7 +74,7 @@ const AdminDashboard = () => {
   });
   const allCourses = coursesData?.data?.data || [];
 
-  // Approve Course Mutation
+  // Approve/Reject Course Mutation
   const approveMutation = useMutation({
     mutationFn: async ({ courseId, approve }) => {
       return courseService.approve(courseId, { 
@@ -84,18 +83,25 @@ const AdminDashboard = () => {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["admin-dashboard"]);
-      queryClient.invalidateQueries(["admin-courses"]);
-      toast({ title: "Course status updated!" });
+      queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-courses"] });
+      toast({ title: "Course status updated successfully!" });
     },
+    onError: (error) => {
+      toast({
+        title: "Action failed",
+        description: error.response?.data?.message || "Could not update course status",
+        variant: "destructive"
+      });
+    }
   });
 
   // Delete Enrollment Mutation
   const deleteEnrollmentMutation = useMutation({
     mutationFn: enrollmentService.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries(["admin-enrollments"]);
-      queryClient.invalidateQueries(["admin-dashboard"]);
+      queryClient.invalidateQueries({ queryKey: ["admin-enrollments"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] });
       toast({ title: "Enrollment deleted successfully" });
     },
     onError: (error) => {
@@ -107,12 +113,20 @@ const AdminDashboard = () => {
     }
   });
 
-  if (isDashLoading) return <div className="p-8 text-center"><Loader2 className="animate-spin inline mr-2" /> Loading Admin Dashboard...</div>;
+  if (isDashLoading) {
+    return (
+      <div className="p-8 text-center flex items-center justify-center min-h-[400px]">
+        <Loader2 className="animate-spin inline mr-2 text-primary w-6 h-6" /> 
+        <span className="text-muted-foreground font-medium">Loading Admin Dashboard...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 animate-fade-in max-w-7xl mx-auto pb-12">
       <h1 className="text-3xl font-bold tracking-tight">Admin Control Center</h1>
 
+      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <Card className="border-none shadow-sm">
           <CardHeader className="pb-2">
@@ -165,39 +179,54 @@ const AdminDashboard = () => {
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="courses">Course Management</TabsTrigger>
           <TabsTrigger value="enrollments">Enrollments</TabsTrigger>
-          <TabsTrigger value="users">User Activity</TabsTrigger>
         </TabsList>
 
+        {/* Overview Tab Content */}
         <TabsContent value="overview" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
              <Card>
-                <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Clock className="w-5 h-5 text-primary" /> Recent Active Users</CardTitle></CardHeader>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Clock className="w-5 h-5 text-primary" /> Recent Active Users
+                  </CardTitle>
+                </CardHeader>
                 <CardContent>
                    <div className="space-y-4">
                       {recentUsers.map(user => (
                         <div key={user.id} className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0">
                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center font-bold text-xs text-primary">{user.fullName[0]}</div>
+                              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center font-bold text-xs text-primary">
+                                {user.fullName ? user.fullName[0].toUpperCase() : "U"}
+                              </div>
                               <div>
                                  <p className="text-sm font-bold">{user.fullName}</p>
                                  <p className="text-[10px] text-muted-foreground">{user.email}</p>
                               </div>
                            </div>
-                           <Badge variant="outline" className="text-[10px]">Last: {new Date(user.lastActivity).toLocaleDateString()}</Badge>
+                           <Badge variant="outline" className="text-[10px]">
+                             Last: {new Date(user.lastActivity).toLocaleDateString()}
+                           </Badge>
                         </div>
                       ))}
+                      {recentUsers.length === 0 && (
+                        <p className="text-sm text-muted-foreground text-center py-4 italic">No recent active users found.</p>
+                      )}
                    </div>
                 </CardContent>
              </Card>
 
              <Card>
-                <CardHeader><CardTitle className="text-lg flex items-center gap-2"><TrendingUp className="w-5 h-5 text-green-500" /> Top Performing Courses</CardTitle></CardHeader>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-green-500" /> Top Performing Courses
+                  </CardTitle>
+                </CardHeader>
                 <CardContent>
                    <div className="space-y-4">
                       {topCourses.map(course => (
                         <div key={course.courseId} className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0">
                            <div className="flex items-center gap-3">
-                              <img src={getFullUrl(course.courseImage)} className="w-10 h-8 rounded object-cover" />
+                              <img src={getFullUrl(course.courseImage, "Course")} className="w-10 h-8 rounded object-cover border" alt="" />
                               <p className="text-sm font-bold">{course.title}</p>
                            </div>
                            <div className="flex items-center gap-1 text-amber-500">
@@ -206,12 +235,16 @@ const AdminDashboard = () => {
                            </div>
                         </div>
                       ))}
+                      {topCourses.length === 0 && (
+                        <p className="text-sm text-muted-foreground text-center py-4 italic">No top courses data available.</p>
+                      )}
                    </div>
                 </CardContent>
              </Card>
           </div>
         </TabsContent>
 
+        {/* Course Management Tab Content */}
         <TabsContent value="courses">
           <Card>
             <CardHeader>
@@ -219,57 +252,71 @@ const AdminDashboard = () => {
               <CardDescription>Review and approve newly created courses.</CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Course</TableHead>
-                    <TableHead>Instructor</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {allCourses.map((course) => (
-                    <TableRow key={course.courseId}>
-                      <TableCell className="font-medium">{course.title}</TableCell>
-                      <TableCell>{course.instructorName}</TableCell>
-                      <TableCell>{course.categoryName}</TableCell>
-                      <TableCell>
-                        <Badge variant={course.isApproved ? "success" : "warning"}>
-                          {course.isApproved ? "Approved" : "Pending"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {!course.isApproved && (
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="text-green-600"
-                              onClick={() => approveMutation.mutate({ courseId: course.courseId, approve: true })}
-                            >
-                              <CheckCircle className="w-4 h-4 mr-1" /> Approve
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="text-destructive"
-                              onClick={() => approveMutation.mutate({ courseId: course.courseId, approve: false })}
-                            >
-                              <XCircle className="w-4 h-4 mr-1" /> Reject
-                            </Button>
-                          </div>
-                        )}
-                      </TableCell>
+              {isCoursesLoading ? (
+                <div className="py-10 text-center text-muted-foreground"><Loader2 className="animate-spin inline mr-2" /> Loading courses...</div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Course</TableHead>
+                      <TableHead>Instructor</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {allCourses.map((course) => (
+                      <TableRow key={course.courseId}>
+                        <TableCell className="font-medium">{course.title}</TableCell>
+                        <TableCell>{course.instructorName}</TableCell>
+                        <TableCell>{course.categoryName}</TableCell>
+                        <TableCell>
+                          <Badge variant={course.isApproved ? "success" : "warning"}>
+                            {course.isApproved ? "Approved" : "Pending"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {!course.isApproved && (
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                                disabled={approveMutation.isPending}
+                                onClick={() => approveMutation.mutate({ courseId: course.courseId, approve: true })}
+                              >
+                                <CheckCircle className="w-4 h-4 mr-1" /> Approve
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-destructive hover:bg-destructive/5"
+                                disabled={approveMutation.isPending}
+                                onClick={() => approveMutation.mutate({ courseId: course.courseId, approve: false })}
+                              >
+                                <XCircle className="w-4 h-4 mr-1" /> Reject
+                              </Button>
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {allCourses.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-10 text-muted-foreground italic">
+                          No courses found.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
+        {/* Enrollments Tab Content */}
         <TabsContent value="enrollments">
           <Card>
             <CardHeader>
@@ -278,7 +325,7 @@ const AdminDashboard = () => {
             </CardHeader>
             <CardContent>
               {isEnrollLoading ? (
-                <div className="py-10 text-center"><Loader2 className="animate-spin inline mr-2" /> Loading enrollments...</div>
+                <div className="py-10 text-center text-muted-foreground"><Loader2 className="animate-spin inline mr-2" /> Loading enrollments...</div>
               ) : (
                 <Table>
                   <TableHeader>
@@ -307,6 +354,7 @@ const AdminDashboard = () => {
                             size="sm"
                             variant="ghost"
                             className="text-destructive hover:bg-destructive/10"
+                            disabled={deleteEnrollmentMutation.isPending}
                             onClick={() => {
                               if (window.confirm("Are you sure you want to delete this enrollment?")) {
                                 deleteEnrollmentMutation.mutate(enrollment.enrollmentId);

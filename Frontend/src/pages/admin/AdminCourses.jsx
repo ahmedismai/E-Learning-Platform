@@ -36,8 +36,11 @@ const AdminCourses = () => {
   const getFullUrl = (path) => {
     if (!path || path === "No Image Available") return "/placeholder.svg";
     if (path.startsWith("http")) return path;
-    const baseUrl = api.defaults.baseURL.replace("/api", "");
-    return `${baseUrl}/Images/Course/${path.replace(/\\/g, "/")}`;
+    const backendUrl = import.meta.env.PROD 
+    ? "http://e-learning-platform-3.runasp.net" 
+    : (import.meta.env.VITE_API_URL || "").replace("/api", "");
+
+  return `${backendUrl}/Images/Course/${path.replace(/\\/g, "/")}`;
   };
 
   const { data: response, isLoading } = useQuery({
