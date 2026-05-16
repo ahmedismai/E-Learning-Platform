@@ -99,7 +99,7 @@ const CreateExam = () => {
   useEffect(() => {
     const fetchCourses = async () => {
       try {
-        const response = await api.get("/Course/MyCourses");
+        const response = await api.get("/api/Course/MyCourses");
         setCourses(response.data.data || []);
       } catch (error) {
         toast({

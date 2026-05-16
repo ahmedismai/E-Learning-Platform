@@ -46,7 +46,7 @@ const Payment = () => {
   useEffect(() => {
     const fetchCourse = async () => {
       try {
-        const response = await api.get(`/Course/${courseId}`);
+        const response = await api.get(`/api/Course/${courseId}`);
         const data = response.data.data;
         setCourse({
           id: data.courseId,

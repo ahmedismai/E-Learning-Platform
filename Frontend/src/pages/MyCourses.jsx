@@ -22,7 +22,7 @@ const MyCourses = () => {
   const { data: studentDashboard, isLoading: isStudentLoading } = useQuery({
     queryKey: ["student-dashboard"],
     queryFn: async () => {
-      const response = await api.get("/Dashboards/StudentDashboard");
+      const response = await api.get("/api/Dashboards/StudentDashboard");
       return response.data;
     },
     enabled: isStudent,

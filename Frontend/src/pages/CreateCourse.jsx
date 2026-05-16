@@ -65,7 +65,7 @@ const CreateCourse = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const catRes = await api.get("/Category/List");
+        const catRes = await api.get("/api/Category/List");
         setRealCategories(catRes.data.data || []);
 
         if (isEditMode) {
@@ -122,7 +122,7 @@ const CreateCourse = () => {
           title: "Success!",
           description: "Course created! You can now add sections and lessons.",
         });
-        navigate(`/dashboard/courses/${currentCourseId}`);
+        navigate(`/api/dashboard/courses/${currentCourseId}`);
       }
     } catch (error) {
       console.error("Submit Error:", error);

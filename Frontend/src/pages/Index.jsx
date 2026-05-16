@@ -25,7 +25,7 @@ const Index = () => {
   const { data: response, isLoading } = useQuery({
     queryKey: ["courses", "landing"],
     queryFn: async () => {
-      const response = await api.get("/Course");
+      const response = await api.get("/api/Course");
       return response.data;
     },
   });

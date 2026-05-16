@@ -19,7 +19,7 @@ const Quizzes = ({ isSubComponent = false }) => {
   } = useQuery({
     queryKey: ["quizzes", user?.role],
     queryFn: async () => {
-      const response = await api.get("/Quiz");
+      const response = await api.get("/api/Quiz");
       return response.data;
     },
     enabled: !!user,

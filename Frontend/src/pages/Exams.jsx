@@ -36,7 +36,7 @@ const Exams = ({ isSubComponent = false }) => {
     queryKey: ["exams", user?.role],
     queryFn: async () => {
       if (user?.role === "Student") {
-        const response = await api.get("/Dashboards/StudentDashboard");
+        const response = await api.get("/api/Dashboards/StudentDashboard");
         return response.data.availableExams || [];
       }
       const response = await examService.getAll();
