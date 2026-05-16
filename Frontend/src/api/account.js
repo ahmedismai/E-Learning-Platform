@@ -4,13 +4,13 @@ const accountService = {
 
   // POST /api/Account/Register
   register: async (registerData) => {
-    const response = await api.post("api/Account/Register", registerData);
+    const response = await api.post("/api/Account/Register", registerData);
     return response.data;
   },
 
   // POST /api/Account/Login
   login: async (loginData) => {
-    const response = await api.post("api/Account/Login", loginData);
+    const response = await api.post("/api/Account/Login", loginData);
     return response.data;
   },
 
@@ -22,19 +22,19 @@ const accountService = {
 
   // GET /api/Account/Account/GetProfile
   getProfile: async () => {
-    const response = await api.get("api/Account/Account/GetProfile");
+    const response = await api.get("/api/Account/Account/GetProfile");
     return response.data;
   },
 
   // PUT /api/Account/Account/UpdateProfile
   updateProfile: async (profileData) => {
-    const response = await api.put("api/Account/Account/UpdateProfile", profileData);
+    const response = await api.put("/api/Account/Account/UpdateProfile", profileData);
     return response.data;
   },
 
   // GET /api/Account/Users (Admin)
   getAllUsers: async () => {
-    const response = await api.get("api/Account/Users");
+    const response = await api.get("/api/Account/Users");
     return response.data;
   },
 
@@ -46,19 +46,19 @@ const accountService = {
 
   // POST /api/Account/ResetPassword
   resetPassword: async (email) => {
-    const response = await api.post(`/Account/ResetPassword?email=${email}`);
+    const response = await api.post(`/api/Account/ResetPassword?email=${email}`);
     return response.data;
   },
 
   // POST /api/Account/NewPassword
   newPassword: async (resetData) => {
-    const response = await api.post("api/Account/NewPassword", resetData);
+    const response = await api.post("/api/Account/NewPassword", resetData);
     return response.data;
   },
 
   // GET /api/Account/ConfirmEmail
   confirmEmail: async (userId, token) => {
-    const response = await api.get("api/Account/ConfirmEmail", {
+    const response = await api.get("/api/Account/ConfirmEmail", {
       params: { userId, token },
     });
     return response.data;
@@ -66,13 +66,13 @@ const accountService = {
 
   // POST /api/Account/ResendConfirmEmail
   resendConfirmEmail: async (email) => {
-    const response = await api.post(`api/Account/ResendConfirmEmail?email=${email}`);
+    const response = await api.post(`/api/Account/ResendConfirmEmail?email=${email}`);
     return response.data;
   },
 
   // GET /api/Account/ConfirmResetPassword
   confirmResetPassword: async (userId, token) => {
-    const response = await api.get("api/Account/ConfirmResetPassword", {
+    const response = await api.get("/api/Account/ConfirmResetPassword", {
       params: { userId, token },
     });
     return response.data;
