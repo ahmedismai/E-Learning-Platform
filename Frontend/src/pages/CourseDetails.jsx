@@ -52,8 +52,14 @@ const CourseDetails = () => {
   const queryClient = useQueryClient();
 
   // --- Helpers ---
-  const getFullUrl = (path) =>
-    path ? `https://api.example.com/uploads/${path}` : "";
+  // تعديل الـ Helper للتعامل مع الروابط الكاملة الجاية من الباك إند (runasp.net)
+  const getFullUrl = (path) => {
+    if (!path) return "";
+    if (path.startsWith("http://") || path.startsWith("https://")) {
+      return path;
+    }
+    return `http://e-learning-platform-3.runasp.net/${path}`;
+  };
 
   // Queries
   const { data: courseResponse, isLoading: isCourseLoading } = useQuery({
@@ -260,8 +266,10 @@ const CourseDetails = () => {
     },
   });
 
+  // ربط دالة التحقق من إكمال الدرس ببيانات الـ progress الفعيلة
   const isLessonCompleted = (lessonId) => {
-    return false;
+    if (!progressData?.completedLessons) return false;
+    return progressData.completedLessons.includes(lessonId);
   };
 
   // AI Generation State
@@ -307,9 +315,9 @@ const CourseDetails = () => {
 
   const openEditSection = (section) => {
     setSelectedSection(section);
-    setNewSection({ title: section.title });
-    setIsEditingSection(true);
-    setIsAddingSection(true);
+    NewSection({ title: section.title });
+    SetIsEditingSection(true);
+    SetIsAddingSection(true);
   };
 
   const handleAddContent = async () => {
@@ -540,64 +548,40 @@ const CourseDetails = () => {
                               : "hover:bg-accent/5"
                           }`}
                           onClick={() => {
-                            if (!hasAccess) return;
+                            if (hasAccess) {
+                              const type = lesson.lessonType?.toLowerCase();
 
-                            const type = lesson.lessonType?.toLowerCase();
+                              if (type === "video") {
+                                setActiveLesson(lesson);
+                              } else if (type === "pdf" || type === "text") {
+                                const fileUrl =
+                                  lesson.contentUrl ||
+                                  lesson.pdfUrl ||
+                                  lesson.fileUrl;
 
-                            // تشغيل الفيديو
-                            if (type === "video") {
-                              setActiveLesson(lesson);
-                              return;
-                            }
+                                if (fileUrl) {
+                                  const fullUrl = getFullUrl(fileUrl);
 
-                            // فتح ملفات PDF / Text
-                            if (
-                              type === "pdf" ||
-                              type === "text" ||
-                              type === "file"
-                            ) {
-                              const fileUrl =
-                                lesson.contentUrl ||
-                                lesson.pdfUrl ||
-                                lesson.fileUrl;
+                                  const newWindow = window.open(
+                                    fullUrl,
+                                    "_blank",
+                                    "noopener,noreferrer",
+                                  );
 
-                              if (!fileUrl) {
-                                console.error("File URL not found:", lesson);
-
-                                toast({
-                                  variant: "destructive",
-                                  title: "File not found",
-                                  description:
-                                    "This lesson does not contain a valid file.",
-                                });
-
-                                return;
+                                  if (!newWindow) {
+                                    window.location.href = fullUrl;
+                                  }
+                                } else {
+                                  console.error(
+                                    "عفواً، لم يتم العثور على رابط الملف في البيانات:",
+                                    lesson,
+                                  );
+                                  alert(
+                                    "رابط الملف الخاص بهذا الدرس غير متوفر.",
+                                  );
+                                }
                               }
-
-                              const fullUrl = getFullUrl(fileUrl);
-
-                              console.log("Lesson Type:", lesson.lessonType);
-                              console.log("Original URL:", fileUrl);
-                              console.log("Final URL:", fullUrl);
-
-                              // فتح الملف
-                              const link = document.createElement("a");
-
-                              link.href = fullUrl;
-                              link.target = "_blank";
-                              link.rel = "noopener noreferrer";
-
-                              document.body.appendChild(link);
-                              link.click();
-                              document.body.removeChild(link);
-
-                              return;
                             }
-
-                            console.warn(
-                              "Unsupported lesson type:",
-                              lesson.lessonType,
-                            );
                           }}
                         >
                           <div className="flex items-center gap-4">
@@ -617,7 +601,6 @@ const CourseDetails = () => {
                             <div>
                               <p className="font-semibold">{lesson.title}</p>
                               <Badge variant="outline" className="text-[10px]">
-                                {/* تحديث الـ Badge ليعبر عن الـ Enums الحقيقية بشكل أنظف */}
                                 {lesson.lessonType === "Video"
                                   ? "Video"
                                   : lesson.lessonType === "PDF"
@@ -867,195 +850,6 @@ const CourseDetails = () => {
           </Card>
         </div>
       </div>
-
-      {/* Section Dialog */}
-      <Dialog
-        open={isAddingSection}
-        onOpenChange={(open) => {
-          setIsAddingSection(open);
-          if (!open) {
-            setIsEditingSection(false);
-            setSelectedSection(null);
-            setNewSection({ title: "" });
-          }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {isEditingSection ? "Edit Section" : "New Section"}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-4">
-            <Label>Title</Label>
-            <Input
-              value={newSection.title}
-              onChange={(e) => setNewSection({ title: e.target.value })}
-              placeholder="Section title..."
-            />
-            <Button
-              className="w-full"
-              onClick={handleSaveSection}
-              disabled={
-                addSectionMutation.isPending || updateSectionMutation.isPending
-              }
-            >
-              {addSectionMutation.isPending || updateSectionMutation.isPending
-                ? "Saving..."
-                : "Save Section"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Lesson Dialog */}
-      <Dialog open={isAddingContent} onOpenChange={setIsAddingContent}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {isEditingLesson ? "Edit Lesson" : "New Lesson"}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-4">
-            <Label>Title</Label>
-            <Input
-              value={newContent.title}
-              onChange={(e) =>
-                setNewContent({ ...newContent, title: e.target.value })
-              }
-            />
-
-            <Label>Lesson Type</Label>
-            <select
-              className="w-full p-2 border rounded text-sm bg-background"
-              value={newContent.lessonType}
-              onChange={(e) =>
-                setNewContent({
-                  ...newContent,
-                  lessonType: e.target.value,
-                })
-              }
-            >
-              <option value="Video">Video</option>
-              <option value="PDF">PDF</option>
-              <option value="Text">Text</option>
-            </select>
-
-            <Label>Section</Label>
-            <select
-              className="w-full p-2 border rounded text-sm bg-background"
-              value={newContent.sectionId}
-              onChange={(e) =>
-                setNewContent({ ...newContent, sectionId: e.target.value })
-              }
-            >
-              <option value="">Select Section</option>
-              {sections.map((s) => (
-                <option key={s.sectionId || s.id} value={s.sectionId || s.id}>
-                  {s.title}
-                </option>
-              ))}
-            </select>
-
-            <Label>
-              {newContent.lessonType === "Video"
-                ? "Video File"
-                : "Document File"}
-            </Label>
-            <Input
-              type="file"
-              accept={
-                newContent.lessonType === "Video"
-                  ? "video/*"
-                  : ".pdf,.doc,.docx,.txt"
-              }
-              onChange={(e) =>
-                setNewContent({
-                  ...newContent,
-                  mediaFile: e.target.files[0],
-                })
-              }
-            />
-
-            {newContent.lessonType === "Video" && (
-              <>
-                <Label>Duration (Minutes)</Label>
-                <Input
-                  type="number"
-                  value={newContent.duration}
-                  onChange={(e) =>
-                    setNewContent({
-                      ...newContent,
-                      duration: parseInt(e.target.value),
-                    })
-                  }
-                />
-              </>
-            )}
-
-            <Button
-              className="w-full"
-              onClick={handleAddContent}
-              disabled={isUploading}
-            >
-              {isUploading ? "Saving..." : "Save Lesson"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Review Dialog */}
-      <Dialog open={isReviewing} onOpenChange={setIsReviewing}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Write a Review</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-4">
-            <div className="space-y-2">
-              <Label>Rating</Label>
-              <div className="flex gap-2">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <button
-                    key={star}
-                    type="button"
-                    onClick={() => setReview({ ...review, rating: star })}
-                    className="focus:outline-none transition-transform hover:scale-110"
-                  >
-                    <Star
-                      className={`w-8 h-8 ${star <= review.rating ? "text-amber-500 fill-amber-500" : "text-muted"}`}
-                    />
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Comment</Label>
-              <Textarea
-                placeholder="Share your thoughts about this course..."
-                value={review.comment}
-                onChange={(e) =>
-                  setReview({ ...review, comment: e.target.value })
-                }
-                rows={4}
-              />
-            </div>
-            <Button
-              className="w-full"
-              onClick={() =>
-                addReviewMutation.mutate({
-                  courseId: parseInt(id),
-                  studentId: user.id,
-                  rating: review.rating,
-                  comment: review.comment,
-                })
-              }
-              disabled={addReviewMutation.isPending}
-            >
-              {addReviewMutation.isPending ? "Submitting..." : "Submit Review"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };
