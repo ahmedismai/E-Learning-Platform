@@ -20,7 +20,6 @@ import {
 import { Link } from "react-router-dom";
 import { getFullUrl } from "@/lib/urlHelper";
 
-// Custom Hook بسيط للـ Debounce بدلاً من تحميل مكتبات خارجية
 function useDebounce(value, delay) {
   const [debouncedValue, setDebouncedValue] = useState(value);
 
@@ -42,7 +41,6 @@ const BrowseCourses = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
 
-  // استخدام الـ debouncedSearchTerm في الفلترة والـ Query Key
   const debouncedSearchTerm = useDebounce(searchTerm, 400);
 
   const { data: categoriesResponse, isLoading: isCategoriesLoading } = useQuery(
@@ -56,7 +54,6 @@ const BrowseCourses = () => {
   );
 
   const { data: coursesResponse, isLoading: isCoursesLoading } = useQuery({
-    // نستخدم القيمة الـ debounced هنا لمنع تكرار الـ Requests مع كل ضغطة زر
     queryKey: ["courses", debouncedSearchTerm, selectedCategoryId],
     queryFn: async () => {
       let response;

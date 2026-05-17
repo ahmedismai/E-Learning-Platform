@@ -33,15 +33,16 @@ import { Textarea } from "@/components/ui/textarea";
 
 // Import AI components and services
 import { useAuth } from "@/contexts/AuthContext";
-import  courseService  from '@/api/course';
-import reviewService from '@/api/review';
-import  enrollmentService  from '@/api/enrollment';
-import  examService  from '@/api/exam';
-import  lessonProgressService  from '@/api/lessonProgress';
-import  orderService  from '@/api/order';
-import  lessonService  from '@/api/lesson';
-import  sectionService  from '@/api/section';
-import  AIQuizDialog  from '@/components/AIQuizDialog';
+import courseService from "@/api/course";
+import reviewService from "@/api/review";
+import enrollmentService from "@/api/enrollment";
+import examService from "@/api/exam";
+import lessonProgressService from "@/api/lessonProgress";
+import orderService from "@/api/order";
+import lessonService from "@/api/lesson";
+import sectionService from "@/api/section";
+import AIQuizDialog from "@/components/AIQuizDialog";
+import { getFullUrl } from "@/lib/urlHelper";
 
 const CourseDetails = () => {
   const [activeLesson, setActiveLesson] = useState(null);
@@ -50,16 +51,6 @@ const CourseDetails = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-
-  // --- Helpers ---
-  // Transforms absolute or partial paths into standard full URLs
-  const getFullUrl = (path) => {
-    if (!path) return "";
-    if (path.startsWith("http://") || path.startsWith("https://")) {
-      return path;
-    }
-    return `http://e-learning-platform-3.runasp.net/${path}`;
-  };
 
   // --- Queries ---
   const { data: courseResponse, isLoading: isCourseLoading } = useQuery({
