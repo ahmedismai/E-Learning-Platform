@@ -40,12 +40,13 @@ const AdminUsers = () => {
     queryFn: () => accountService.getAllUsers(),
   });
 
-  const { data: roles = [], isLoading: isRolesLoading } = useQuery({
+  const { data: rolesResponse, isLoading: isRolesLoading } = useQuery({
     queryKey: ["admin", "roles"],
     queryFn: roleService.getAll,
   });
 
   const users = response?.data || [];
+  const roles = rolesResponse?.data || (Array.isArray(rolesResponse) ? rolesResponse : []);
 
   const updateRoleMutation = useMutation({
     mutationFn: async ({ userId, role }) => {
