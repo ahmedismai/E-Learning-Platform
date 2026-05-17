@@ -18,7 +18,7 @@ import {
   Loader2,
 } from "lucide-react";
 
-// استيراد مكونات UI الخاصة بـ shadcn/ui
+// Import shadcn/ui components
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -32,7 +32,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
-// استيراد مكون الـ AIQuizDialog والخدمات
+// Import AI components and services
 import AIQuizDialog from "./AIQuizDialog";
 import { courseService } from "@/services/courseService";
 import { reviewService } from "@/services/reviewService";
@@ -52,7 +52,7 @@ const CourseDetails = () => {
   const queryClient = useQueryClient();
 
   // --- Helpers ---
-  // تعديل الـ Helper للتعامل مع الروابط الكاملة الجاية من الباك إند (runasp.net)
+  // Transforms absolute or partial paths into standard full URLs
   const getFullUrl = (path) => {
     if (!path) return "";
     if (path.startsWith("http://") || path.startsWith("https://")) {
@@ -61,7 +61,7 @@ const CourseDetails = () => {
     return `http://e-learning-platform-3.runasp.net/${path}`;
   };
 
-  // Queries
+  // --- Queries ---
   const { data: courseResponse, isLoading: isCourseLoading } = useQuery({
     queryKey: ["course", id],
     queryFn: () => courseService.getById(id),
@@ -79,7 +79,7 @@ const CourseDetails = () => {
 
   const { data: enrollmentsResponse } = useQuery({
     queryKey: ["enrollments", "me"],
-    queryFn: () => enrollmentService.getByStudent(user.id),
+    queryFn: () => enrollmentService.getByStudent(user?.id),
     enabled: !!user && (user.role === "Student" || user.role === "Admin"),
   });
 
@@ -101,7 +101,6 @@ const CourseDetails = () => {
 
   const progressData = progressResponse?.data;
 
-  // Fetch Exams for this course
   const { data: examsResponse } = useQuery({
     queryKey: ["course-exams", id],
     queryFn: () => examService.getByCourse(id),
@@ -109,7 +108,7 @@ const CourseDetails = () => {
   });
   const courseExams = examsResponse?.data || [];
 
-  // Mutations
+  // --- Mutations ---
   const addReviewMutation = useMutation({
     mutationFn: (newReview) => reviewService.create(newReview),
     onSuccess: () => {
@@ -225,7 +224,7 @@ const CourseDetails = () => {
       toast({
         title: course.isFree
           ? "Enrolled successfully! Enjoy your course."
-          : "Order created successfully! Wait for admin approval.",
+          : "Order created successfully! Waiting for admin approval.",
       });
 
       if (course.isFree && sections[0]?.lessons[0]) {
@@ -266,21 +265,18 @@ const CourseDetails = () => {
     },
   });
 
-  // ربط دالة التحقق من إكمال الدرس ببيانات الـ progress الفعيلة
+  // Validates lesson status against fetched remote list tracking completions
   const isLessonCompleted = (lessonId) => {
     if (!progressData?.completedLessons) return false;
     return progressData.completedLessons.includes(lessonId);
   };
 
-  // AI Generation State
+  // --- State Variables ---
   const [isAiGenerating, setIsAiGenerating] = useState(false);
   const [quickAddCount, setQuickAddCount] = useState(5);
-
-  // Review State
   const [isReviewing, setIsReviewing] = useState(false);
   const [review, setReview] = useState({ rating: 5, comment: "" });
 
-  // Lesson Management State
   const [isAddingContent, setIsAddingContent] = useState(false);
   const [isEditingLesson, setIsEditingLesson] = useState(false);
   const [selectedLesson, setSelectedLesson] = useState(null);
@@ -315,9 +311,9 @@ const CourseDetails = () => {
 
   const openEditSection = (section) => {
     setSelectedSection(section);
-    NewSection({ title: section.title });
-    SetIsEditingSection(true);
-    SetIsAddingSection(true);
+    setNewSection({ title: section.title });
+    setIsEditingSection(true);
+    setIsAddingSection(true);
   };
 
   const handleAddContent = async () => {
@@ -472,6 +468,7 @@ const CourseDetails = () => {
                   <img
                     src={getFullUrl(course.imgPath)}
                     className="w-full h-full object-cover opacity-60"
+                    alt="Course Preview"
                   />
                 ) : (
                   <div className="w-full h-full bg-slate-900" />
@@ -538,128 +535,231 @@ const CourseDetails = () => {
                         </div>
                       )}
                     </div>
+
                     <div className="space-y-2">
-                      {section.lessons?.map((lesson, idx) => (
-                        <div
-                          key={lesson.lessonId}
-                          className={`flex items-center justify-between p-3 rounded cursor-pointer transition-all ${
-                            activeLesson?.lessonId === lesson.lessonId
-                              ? "bg-primary/5 border-l-4 border-primary"
-                              : "hover:bg-accent/5"
-                          }`}
-                          onClick={() => {
-                            if (hasAccess) {
-                              const type = lesson.lessonType?.toLowerCase();
+                      {section.lessons?.map((lesson, idx) => {
+                        const isCompleted = isLessonCompleted(lesson.lessonId);
+                        const lessonType = lesson.lessonType?.toLowerCase();
+                        const isActive =
+                          activeLesson?.lessonId === lesson.lessonId;
+                        const fileUrl =
+                          lesson.contentUrl || lesson.pdfUrl || lesson.fileUrl;
+                        const fullUrl = getFullUrl(fileUrl);
 
-                              if (type === "video") {
-                                setActiveLesson(lesson);
-                              } else if (type === "pdf" || type === "text") {
-                                const fileUrl =
-                                  lesson.contentUrl ||
-                                  lesson.pdfUrl ||
-                                  lesson.fileUrl;
-
-                                if (fileUrl) {
-                                  const fullUrl = getFullUrl(fileUrl);
-
-                                  const newWindow = window.open(
-                                    fullUrl,
-                                    "_blank",
-                                    "noopener,noreferrer",
-                                  );
-
-                                  if (!newWindow) {
-                                    window.location.href = fullUrl;
-                                  }
-                                } else {
-                                  console.error(
-                                    "عفواً، لم يتم العثور على رابط الملف في البيانات:",
-                                    lesson,
-                                  );
-                                  alert(
-                                    "رابط الملف الخاص بهذا الدرس غير متوفر.",
-                                  );
+                        // Render PDF/Text using standard anchor element to avoid JS click handler blocking or missing events
+                        if (lessonType === "pdf" || lessonType === "text") {
+                          return (
+                            <a
+                              key={lesson.lessonId}
+                              href={hasAccess && fileUrl ? fullUrl : "#"}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => {
+                                if (!hasAccess) {
+                                  e.preventDefault();
+                                  toast({
+                                    variant: "destructive",
+                                    title: "Access Denied",
+                                    description:
+                                      "You do not have access to this course content.",
+                                  });
+                                  return;
                                 }
-                              }
-                            }
-                          }}
-                        >
-                          <div className="flex items-center gap-4">
-                            <div
-                              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                                isLessonCompleted(lesson.lessonId)
-                                  ? "bg-green-500 text-white"
-                                  : "bg-muted"
+                                console.log(
+                                  "Directly opening document via anchor link element:",
+                                  fullUrl,
+                                );
+                              }}
+                              className={`flex items-center justify-between p-3 rounded transition-all no-underline text-foreground ${
+                                !hasAccess
+                                  ? "opacity-60 cursor-not-allowed"
+                                  : "hover:bg-accent/5 cursor-pointer"
                               }`}
                             >
-                              {isLessonCompleted(lesson.lessonId) ? (
-                                <CheckCircle2 className="w-5 h-5" />
-                              ) : (
-                                idx + 1
+                              <div className="flex items-center gap-4">
+                                <div
+                                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                                    isCompleted
+                                      ? "bg-green-500 text-white"
+                                      : "bg-muted"
+                                  }`}
+                                >
+                                  {isCompleted ? (
+                                    <CheckCircle2 className="w-5 h-5" />
+                                  ) : (
+                                    idx + 1
+                                  )}
+                                </div>
+                                <div>
+                                  <p className="font-semibold">
+                                    {lesson.title}
+                                  </p>
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px]"
+                                  >
+                                    {lesson.lessonType === "PDF"
+                                      ? "PDF"
+                                      : "Text"}
+                                  </Badge>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                {isInstructor && (
+                                  <>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-8 w-8 text-primary"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        openEditLesson(lesson);
+                                      }}
+                                    >
+                                      <PlusCircle className="w-4 h-4 rotate-45" />
+                                    </Button>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-8 w-8 text-destructive"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        handleDeleteLesson(lesson.lessonId);
+                                      }}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </>
+                                )}
+                                {isStudentEnrolled && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    disabled={
+                                      isCompleted ||
+                                      completeLessonMutation.isPending
+                                    }
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      completeLessonMutation.mutate(
+                                        lesson.lessonId,
+                                      );
+                                    }}
+                                  >
+                                    {isCompleted ? "Completed" : "Mark Done"}
+                                  </Button>
+                                )}
+                              </div>
+                            </a>
+                          );
+                        }
+
+                        // Otherwise render standard interactive video div block
+                        return (
+                          <div
+                            key={lesson.lessonId}
+                            className={`flex items-center justify-between p-3 rounded cursor-pointer transition-all ${
+                              isActive
+                                ? "bg-primary/5 border-l-4 border-primary"
+                                : "hover:bg-accent/5"
+                            }`}
+                            onClick={() => {
+                              if (!hasAccess) {
+                                toast({
+                                  variant: "destructive",
+                                  title: "Access Denied",
+                                  description:
+                                    "You do not have access to this course.",
+                                });
+                                return;
+                              }
+                              if (lessonType === "video") {
+                                console.log(
+                                  "Setting target active video content:",
+                                  lesson,
+                                );
+                                setActiveLesson(lesson);
+                              }
+                            }}
+                          >
+                            <div className="flex items-center gap-4">
+                              <div
+                                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                                  isCompleted
+                                    ? "bg-green-500 text-white"
+                                    : "bg-muted"
+                                }`}
+                              >
+                                {isCompleted ? (
+                                  <CheckCircle2 className="w-5 h-5" />
+                                ) : (
+                                  idx + 1
+                                )}
+                              </div>
+                              <div>
+                                <p className="font-semibold">{lesson.title}</p>
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px]"
+                                >
+                                  Video
+                                </Badge>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              {isInstructor && (
+                                <>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-8 w-8 text-primary"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openEditLesson(lesson);
+                                    }}
+                                  >
+                                    <PlusCircle className="w-4 h-4 rotate-45" />
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-8 w-8 text-destructive"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteLesson(lesson.lessonId);
+                                    }}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </>
+                              )}
+                              {isStudentEnrolled && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  disabled={
+                                    isCompleted ||
+                                    completeLessonMutation.isPending
+                                  }
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    completeLessonMutation.mutate(
+                                      lesson.lessonId,
+                                    );
+                                  }}
+                                >
+                                  {isCompleted ? "Completed" : "Mark Done"}
+                                </Button>
                               )}
                             </div>
-                            <div>
-                              <p className="font-semibold">{lesson.title}</p>
-                              <Badge variant="outline" className="text-[10px]">
-                                {lesson.lessonType === "Video"
-                                  ? "Video"
-                                  : lesson.lessonType === "PDF"
-                                    ? "PDF"
-                                    : "Text"}
-                              </Badge>
-                            </div>
                           </div>
-
-                          <div className="flex items-center gap-2">
-                            {isInstructor && (
-                              <>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-8 w-8 text-primary"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openEditLesson(lesson);
-                                  }}
-                                >
-                                  <PlusCircle className="w-4 h-4 rotate-45" />
-                                </Button>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-8 w-8 text-destructive"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteLesson(lesson.lessonId);
-                                  }}
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              </>
-                            )}
-                            {isStudentEnrolled && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                disabled={
-                                  isLessonCompleted(lesson.lessonId) ||
-                                  completeLessonMutation.isPending
-                                }
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  completeLessonMutation.mutate(
-                                    lesson.lessonId,
-                                  );
-                                }}
-                              >
-                                {isLessonCompleted(lesson.lessonId)
-                                  ? "Completed"
-                                  : "Mark Done"}
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 ))
@@ -704,10 +804,10 @@ const CourseDetails = () => {
                           <div>
                             <h4 className="font-bold">{r.studentName}</h4>
                             <div className="flex items-center gap-1 my-1">
-                              {[...Array(5)].map((_, i) => (
+                              {[...Array(5)].map((_, idx) => (
                                 <Star
-                                  key={i}
-                                  className={`w-3 h-3 ${i < r.rating ? "text-amber-500 fill-amber-500" : "text-muted"}`}
+                                  key={idx}
+                                  className={`w-3 h-3 ${idx < r.rating ? "text-amber-500 fill-amber-500" : "text-muted"}`}
                                 />
                               ))}
                             </div>
@@ -743,6 +843,7 @@ const CourseDetails = () => {
           </Card>
         </div>
 
+        {/* Sidebar */}
         <div className="lg:col-span-1">
           <Card className="sticky top-24 border-2 shadow-xl">
             {!hasAccess ? (
@@ -850,6 +951,203 @@ const CourseDetails = () => {
           </Card>
         </div>
       </div>
+
+      {/* Add/Edit Section Dialog */}
+      <Dialog
+        open={isAddingSection}
+        onOpenChange={(open) => {
+          setIsAddingSection(open);
+          if (!open) {
+            setIsEditingSection(false);
+            setSelectedSection(null);
+            setNewSection({ title: "" });
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {isEditingSection ? "Edit Section" : "Add New Section"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="sectionTitle">Section Title</Label>
+              <Input
+                id="sectionTitle"
+                value={newSection.title}
+                onChange={(e) => setNewSection({ title: e.target.value })}
+                placeholder="e.g., Introduction to CSS"
+              />
+            </div>
+            <Button
+              className="w-full"
+              onClick={handleSaveSection}
+              disabled={
+                addSectionMutation.isPending || updateSectionMutation.isPending
+              }
+            >
+              Save Section
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add/Edit Lesson Content Dialog */}
+      <Dialog
+        open={isAddingContent}
+        onOpenChange={(open) => {
+          setIsAddingContent(open);
+          if (!open) {
+            setIsEditingLesson(false);
+            setSelectedLesson(null);
+            setNewContent({
+              title: "",
+              lessonType: "Video",
+              mediaFile: null,
+              sectionId: "",
+              duration: 10,
+            });
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {isEditingLesson
+                ? "Edit Lesson Material"
+                : "Add New Lesson Content"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="lessonTitle">Lesson Title</Label>
+              <Input
+                id="lessonTitle"
+                value={newContent.title}
+                onChange={(e) =>
+                  setNewContent({ ...newContent, title: e.target.value })
+                }
+                placeholder="Enter item title"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="sectionSelect">Target Section</Label>
+              <select
+                id="sectionSelect"
+                className="w-full p-2 border rounded-md bg-background"
+                value={newContent.sectionId}
+                onChange={(e) =>
+                  setNewContent({ ...newContent, sectionId: e.target.value })
+                }
+              >
+                <option value="">-- Select Section --</option>
+                {sections.map((s) => (
+                  <option key={s.sectionId} value={s.sectionId}>
+                    {s.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="contentType">Material Type</Label>
+              <select
+                id="contentType"
+                className="w-full p-2 border rounded-md bg-background"
+                value={newContent.lessonType}
+                onChange={(e) =>
+                  setNewContent({ ...newContent, lessonType: e.target.value })
+                }
+              >
+                <option value="Video">Video Production</option>
+                <option value="PDF">PDF Handbook</option>
+                <option value="Text">Text Resource</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="fileInput">Source File Asset</Label>
+              <Input
+                id="fileInput"
+                type="file"
+                onChange={(e) =>
+                  setNewContent({ ...newContent, mediaFile: e.target.files[0] })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="durationMinutes">
+                Estimated Duration (Minutes)
+              </Label>
+              <Input
+                id="durationMinutes"
+                type="number"
+                value={newContent.duration}
+                onChange={(e) =>
+                  setNewContent({
+                    ...newContent,
+                    duration: parseInt(e.target.value) || 0,
+                  })
+                }
+              />
+            </div>
+            <Button className="w-full" onClick={handleAddContent}>
+              Upload Content
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Review Dialog */}
+      <Dialog open={isReviewing} onOpenChange={setIsReviewing}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Share Your Review</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="reviewRating">Rating (1 to 5 Stars)</Label>
+              <Input
+                id="reviewRating"
+                type="number"
+                min="1"
+                max="5"
+                value={review.rating}
+                onChange={(e) =>
+                  setReview({
+                    ...review,
+                    rating: parseInt(e.target.value) || 5,
+                  })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="reviewComment">Your Feedback Comment</Label>
+              <Textarea
+                id="reviewComment"
+                value={review.comment}
+                onChange={(e) =>
+                  setReview({ ...review, comment: e.target.value })
+                }
+                placeholder="Write your opinion about the course experience..."
+              />
+            </div>
+            <Button
+              className="w-full"
+              onClick={() =>
+                addReviewMutation.mutate({
+                  courseId: parseInt(id),
+                  studentId: user.id,
+                  rating: review.rating,
+                  comment: review.comment,
+                })
+              }
+              disabled={addReviewMutation.isPending}
+            >
+              Submit Review
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
