@@ -320,30 +320,31 @@ const CourseDetails = () => {
     if (!newContent.title || !newContent.sectionId) return;
     setIsUploading(true);
     try {
-      // 1️⃣ حساب الـ Order تلقائياً بناءً على عدد الدروس الموجودة في السكشن حالياً
       const targetSection = sections.find(
-        (s) => String(s.sectionId) === String(newContent.sectionId),
+        (s) => String(s.sectionId || s.id) === String(newContent.sectionId),
       );
       const currentLessonsCount = targetSection?.lessons?.length || 0;
       const nextOrder = currentLessonsCount + 1;
 
+      let finalOrder = nextOrder;
+      if (isEditingLesson && selectedLesson) {
+        finalOrder = selectedLesson.order || selectedLesson.Order || 1;
+      }
+      if (finalOrder < 1) finalOrder = 1;
+
       const formData = new FormData();
-      formData.append("SectionId", newContent.sectionId);
-      formData.append("Title", newContent.title);
+
+      formData.append("sectionId", newContent.sectionId);
+      formData.append("title", newContent.title.trim());
 
       if (newContent.videoFile) {
-        formData.append("File", newContent.videoFile);
+        formData.append("file", newContent.videoFile);
       }
 
-      formData.append("LessonType", "Video");
-      formData.append("DurationInMinutes", String(newContent.duration || 10));
+      formData.append("lessonType", "Video");
+      formData.append("durationInMinutes", String(newContent.duration || 10));
 
-      // ✅ 2️⃣ إضافة الـ Order الإجباري عشان يحل مشكلة الـ 400 Validation Error
-      if (isEditingLesson && selectedLesson) {
-        formData.append("Order", String(selectedLesson.order || 1));
-      } else {
-        formData.append("Order", String(nextOrder));
-      }
+      formData.append("order", String(finalOrder));
 
       if (isEditingLesson && selectedLesson) {
         await lessonService.update(selectedLesson.lessonId, formData);
@@ -353,9 +354,7 @@ const CourseDetails = () => {
         toast({ title: "Lesson added successfully!" });
       }
 
-      // 3️⃣ عمل تحديث للـ Queries لتجنب أي 404 أو اختفاء بيانات
       queryClient.invalidateQueries(["course", id]);
-
       setIsAddingContent(false);
       setIsEditingLesson(false);
       setSelectedLesson(null);
@@ -366,6 +365,7 @@ const CourseDetails = () => {
         duration: 10,
       });
     } catch (error) {
+      console.error("Validation Error Details:", error.response?.data);
       toast({
         variant: "destructive",
         title: isEditingLesson

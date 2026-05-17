@@ -23,9 +23,9 @@ import {
   Award,
   User,
   GraduationCap,
-  Trash2, 
-  Edit2, 
-  ClipboardList
+  Trash2,
+  Edit2,
+  ClipboardList,
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useState } from "react";
@@ -262,10 +262,12 @@ const CourseDetails = () => {
     if (!progressData) return false;
     // Checks if backend supplies progress records nested within an array
     if (Array.isArray(progressData.completedLessons)) {
-      return progressData.completedLessons.some(l => l.lessonId === lessonId);
+      return progressData.completedLessons.some((l) => l.lessonId === lessonId);
     }
     if (Array.isArray(progressData.lessonProgresses)) {
-      return progressData.lessonProgresses.some(l => l.lessonId === lessonId && l.isCompleted);
+      return progressData.lessonProgresses.some(
+        (l) => l.lessonId === lessonId && l.isCompleted,
+      );
     }
     return false;
   };
@@ -316,14 +318,31 @@ const CourseDetails = () => {
     if (!newContent.title || !newContent.sectionId) return;
     setIsUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("SectionId", newContent.sectionId);
-      formData.append("Title", newContent.title);
-      if (newContent.videoFile) {
-        formData.append("File", newContent.videoFile);
+      const targetSection = sections.find(
+        (s) => String(s.sectionId || s.id) === String(newContent.sectionId),
+      );
+      const currentLessonsCount = targetSection?.lessons?.length || 0;
+      const nextOrder = currentLessonsCount + 1;
+
+      let finalOrder = nextOrder;
+      if (isEditingLesson && selectedLesson) {
+        finalOrder = selectedLesson.order || selectedLesson.Order || 1;
       }
-      formData.append("LessonType", "Video");
-      formData.append("DurationInMinutes", String(newContent.duration));
+      if (finalOrder < 1) finalOrder = 1;
+
+      const formData = new FormData();
+
+      formData.append("sectionId", newContent.sectionId);
+      formData.append("title", newContent.title.trim());
+
+      if (newContent.videoFile) {
+        formData.append("file", newContent.videoFile);
+      }
+
+      formData.append("lessonType", "Video");
+      formData.append("durationInMinutes", String(newContent.duration || 10));
+
+      formData.append("order", String(finalOrder));
 
       if (isEditingLesson && selectedLesson) {
         await lessonService.update(selectedLesson.lessonId, formData);
@@ -344,9 +363,16 @@ const CourseDetails = () => {
         duration: 10,
       });
     } catch (error) {
+      console.error("Validation Error Details:", error.response?.data);
       toast({
         variant: "destructive",
-        title: isEditingLesson ? "Failed to update lesson" : "Failed to add lesson",
+        title: isEditingLesson
+          ? "Failed to update lesson"
+          : "Failed to add lesson",
+        description:
+          error.response?.data?.errors?.Order?.[0] ||
+          error.response?.data?.title ||
+          "Validation Error",
       });
     } finally {
       setIsUploading(false);
@@ -423,7 +449,11 @@ const CourseDetails = () => {
               <div className="flex items-center gap-2">
                 <Clock className="w-5 h-5" />
                 <span>
-                  {sections.reduce((acc, s) => acc + (s.lessons?.length || 0), 0)} lessons
+                  {sections.reduce(
+                    (acc, s) => acc + (s.lessons?.length || 0),
+                    0,
+                  )}{" "}
+                  lessons
                 </span>
               </div>
             </div>
@@ -501,7 +531,9 @@ const CourseDetails = () => {
                             variant="ghost"
                             className="h-8 w-8 text-destructive"
                             onClick={() => {
-                              if (confirm("Delete section and all its lessons?")) {
+                              if (
+                                confirm("Delete section and all its lessons?")
+                              ) {
                                 deleteSectionMutation.mutate(section.sectionId);
                               }
                             }}
@@ -536,7 +568,9 @@ const CourseDetails = () => {
                             <div>
                               <p className="font-semibold">{lesson.title}</p>
                               <Badge variant="outline" className="text-[10px]">
-                                {lesson.lessonType === "Video" ? "Video" : "File"}
+                                {lesson.lessonType === "Video"
+                                  ? "Video"
+                                  : "File"}
                               </Badge>
                             </div>
                           </div>
@@ -577,10 +611,14 @@ const CourseDetails = () => {
                                 }
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  completeLessonMutation.mutate(lesson.lessonId);
+                                  completeLessonMutation.mutate(
+                                    lesson.lessonId,
+                                  );
                                 }}
                               >
-                                {isLessonCompleted(lesson.lessonId) ? "Completed" : "Mark Done"}
+                                {isLessonCompleted(lesson.lessonId)
+                                  ? "Completed"
+                                  : "Mark Done"}
                               </Button>
                             )}
                           </div>
@@ -601,7 +639,8 @@ const CourseDetails = () => {
           <Card className="border-none shadow-md">
             <CardHeader className="border-b flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2">
-                <MessageSquare className="w-5 h-5 text-primary" /> Student Reviews
+                <MessageSquare className="w-5 h-5 text-primary" /> Student
+                Reviews
               </CardTitle>
               {isStudentEnrolled && !isInstructor && (
                 <Button
@@ -637,12 +676,15 @@ const CourseDetails = () => {
                               ))}
                             </div>
                           </div>
-                          {(user?.id === r.studentId || user?.role === "Admin") && (
+                          {(user?.id === r.studentId ||
+                            user?.role === "Admin") && (
                             <Button
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8 text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={() => deleteReviewMutation.mutate(r.studentId)}
+                              onClick={() =>
+                                deleteReviewMutation.mutate(r.studentId)
+                              }
                               disabled={deleteReviewMutation.isPending}
                             >
                               <Trash2 className="w-4 h-4" />
@@ -691,7 +733,9 @@ const CourseDetails = () => {
               </>
             ) : isInstructor ? (
               <CardContent className="p-8 space-y-4">
-                <h3 className="text-xl font-bold text-center">Instructor Control</h3>
+                <h3 className="text-xl font-bold text-center">
+                  Instructor Control
+                </h3>
                 <AIQuizDialog
                   courseId={id}
                   mode="instructor"
@@ -750,7 +794,8 @@ const CourseDetails = () => {
                 {progressData?.canTakeExam && courseExams.length > 0 && (
                   <div className="pt-4 border-t space-y-3">
                     <p className="text-sm font-medium text-muted-foreground flex items-center justify-center gap-2">
-                      <GraduationCap className="w-4 h-4 text-primary" /> Course Completed!
+                      <GraduationCap className="w-4 h-4 text-primary" /> Course
+                      Completed!
                     </p>
                     {courseExams.map((exam) => (
                       <Button
@@ -800,7 +845,9 @@ const CourseDetails = () => {
             <Button
               className="w-full"
               onClick={handleSaveSection}
-              disabled={addSectionMutation.isPending || updateSectionMutation.isPending}
+              disabled={
+                addSectionMutation.isPending || updateSectionMutation.isPending
+              }
             >
               {addSectionMutation.isPending || updateSectionMutation.isPending
                 ? "Saving..."
@@ -814,19 +861,25 @@ const CourseDetails = () => {
       <Dialog open={isAddingContent} onOpenChange={setIsAddingContent}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{isEditingLesson ? "Edit Lesson" : "New Lesson"}</DialogTitle>
+            <DialogTitle>
+              {isEditingLesson ? "Edit Lesson" : "New Lesson"}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-4">
             <Label>Title</Label>
             <Input
               value={newContent.title}
-              onChange={(e) => setNewContent({ ...newContent, title: e.target.value })}
+              onChange={(e) =>
+                setNewContent({ ...newContent, title: e.target.value })
+              }
             />
             <Label>Section</Label>
             <select
               className="w-full p-2 border rounded bg-background"
               value={newContent.sectionId}
-              onChange={(e) => setNewContent({ ...newContent, sectionId: e.target.value })}
+              onChange={(e) =>
+                setNewContent({ ...newContent, sectionId: e.target.value })
+              }
             >
               <option value="">Select Section</option>
               {sections.map((s) => (
@@ -839,7 +892,9 @@ const CourseDetails = () => {
             <Input
               type="file"
               accept="video/*"
-              onChange={(e) => setNewContent({ ...newContent, videoFile: e.target.files[0] })}
+              onChange={(e) =>
+                setNewContent({ ...newContent, videoFile: e.target.files[0] })
+              }
             />
             <Button
               className="w-full"
@@ -876,7 +931,9 @@ const CourseDetails = () => {
             <Label>Comment</Label>
             <Textarea
               value={review.comment}
-              onChange={(e) => setReview({ ...review, comment: e.target.value })}
+              onChange={(e) =>
+                setReview({ ...review, comment: e.target.value })
+              }
               placeholder="Tell us what you think about this course..."
             />
             <Button
