@@ -19,6 +19,7 @@ import {
   Trash2,
   Loader2,
   Calendar,
+  ClipboardList,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -39,24 +40,24 @@ const Exams = ({ isSubComponent = false }) => {
         const response = await api.get("/api/Dashboards/StudentDashboard");
         return response.data.availableExams || [];
       }
-      
+
       if (user?.role === "Instructor") {
         // Instructors can't use getAll (403), so they must fetch per course
         const coursesResponse = await api.get("/api/Course/MyCourses");
         const courses = coursesResponse.data.data || [];
-        
+
         const examsPromises = courses.map(async (course) => {
           try {
             const examRes = await examService.getByCourse(course.courseId);
-            return (examRes.data || []).map(exam => ({
+            return (examRes.data || []).map((exam) => ({
               ...exam,
-              courseTitle: course.title
+              courseTitle: course.title,
             }));
           } catch (e) {
             return [];
           }
         });
-        
+
         const allExams = await Promise.all(examsPromises);
         return allExams.flat();
       }
