@@ -17,7 +17,6 @@ const Chatbot = () => {
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -32,38 +31,76 @@ const Chatbot = () => {
     if (!content) return null;
 
     try {
-      if (
-        typeof content === "string" &&
-        (content.trim().startsWith("{") || content.trim().startsWith("["))
-      ) {
-        const parsed = JSON.parse(content);
+      let parsedData =
+        typeof content === "string" ? JSON.parse(content) : content;
 
-        if (parsed.recommendations && Array.isArray(parsed.recommendations)) {
-          return (
-            <div className="space-y-3">
-              <p className="font-semibold text-primary">
-                Here are some recommendations:
-              </p>
-              {parsed.recommendations.map((rec, i) => (
+      if (parsedData && typeof parsedData.recommendations === "string") {
+        parsedData.recommendations = JSON.parse(parsedData.recommendations);
+      }
+
+      if (
+        parsedData &&
+        parsedData.recommendations &&
+        Array.isArray(parsedData.recommendations)
+      ) {
+        return (
+          <div className="space-y-3 min-w-[260px]">
+            <p className="font-semibold text-primary text-xs flex items-center gap-1">
+              ✨ Here are some recommended courses for you:
+            </p>
+            <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-1">
+              {parsedData.recommendations.map((rec, i) => (
                 <div
-                  key={i}
-                  className="bg-slate-50 p-2 rounded-lg border border-primary/10 text-xs"
+                  key={rec.courseId || i}
+                  className="bg-slate-50 p-3 rounded-xl border border-slate-200/60 hover:border-primary/30 transition-colors shadow-sm flex flex-col gap-1"
                 >
-                  <p className="font-bold text-slate-800">{rec.title}</p>
-                  <p className="text-slate-600 mt-1">{rec.reason}</p>
+                  <div className="flex justify-between items-start gap-2">
+                    <h4 className="font-bold text-slate-800 text-xs line-clamp-2 leading-tight">
+                      {rec.title}
+                    </h4>
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${
+                        rec.price === 0
+                          ? "bg-green-100 text-green-700"
+                          : "bg-blue-100 text-blue-700"
+                      }`}
+                    >
+                      {rec.price === 0 ? "Free" : `$${rec.price}`}
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] text-slate-600 mt-1 leading-normal italic">
+                    "{rec.reason}"
+                  </p>
+
+                  <div className="flex justify-between items-center mt-2 pt-1.5 border-t border-slate-100 text-[10px] text-slate-400">
+                    <span>
+                      Instructor:{" "}
+                      <strong className="text-slate-500">
+                        {rec.instructorName}
+                      </strong>
+                    </span>
+                    <span className="bg-slate-200/50 text-slate-600 px-1.5 py-0.5 rounded">
+                      {rec.categoryName}
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
-          );
-        }
+          </div>
+        );
+      }
 
-        if (parsed.response) {
-          return <p className="whitespace-pre-wrap">{parsed.response}</p>;
-        }
+      if (parsedData && parsedData.response) {
+        return <p className="whitespace-pre-wrap">{parsedData.response}</p>;
       }
     } catch (e) {}
 
-    return <p className="whitespace-pre-wrap">{content}</p>;
+    return (
+      <p className="whitespace-pre-wrap">
+        {typeof content === "object" ? JSON.stringify(content) : content}
+      </p>
+    );
   };
 
   const handleSend = async () => {
@@ -77,13 +114,9 @@ const Chatbot = () => {
 
     try {
       const data = await chatbotService.ask(currentInput);
-
-      const botReply =
-        data.response ||
-        data.answer ||
-        (typeof data === "string"
-          ? data
-          : "I received an invalid response format.");
+      const botReply = data.recommendations
+        ? data
+        : data.response || data.answer || data;
 
       setMessages((prev) => [...prev, { role: "bot", content: botReply }]);
     } catch (error) {
