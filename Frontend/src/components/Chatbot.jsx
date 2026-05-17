@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { MessageCircle, X, Send, User, Bot, Loader2, Sparkles } from "lucide-react";
+import { MessageCircle, X, Send, Bot, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,32 +11,44 @@ const Chatbot = () => {
   const [messages, setMessages] = useState([
     {
       role: "bot",
-      content: "Hi! I'm LearnHub AI. I can help you understand concepts, debug code, or give study tips. (Note: I cannot solve exams or quizzes for you! 😊)",
+      content:
+        "Hi! I'm LearnHub AI. I can help you understand concepts, debug code, or give study tips. (Note: I cannot solve exams or quizzes for you! 😊)",
     },
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const scrollRef = useRef(null);
+
+  const messagesEndRef = useRef(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages]);
+    scrollToBottom();
+  }, [messages, isLoading]);
 
   const renderMessageContent = (content) => {
+    if (!content) return null;
+
     try {
-      // Try to parse if it's a JSON string
-      if (typeof content === 'string' && (content.trim().startsWith('{') || content.trim().startsWith('['))) {
+      if (
+        typeof content === "string" &&
+        (content.trim().startsWith("{") || content.trim().startsWith("["))
+      ) {
         const parsed = JSON.parse(content);
-        
-        // If it's a recommendations object
+
         if (parsed.recommendations && Array.isArray(parsed.recommendations)) {
           return (
             <div className="space-y-3">
-              <p className="font-semibold text-primary">Here are some recommendations:</p>
+              <p className="font-semibold text-primary">
+                Here are some recommendations:
+              </p>
               {parsed.recommendations.map((rec, i) => (
-                <div key={i} className="bg-slate-50 p-2 rounded-lg border border-primary/10 text-xs">
+                <div
+                  key={i}
+                  className="bg-slate-50 p-2 rounded-lg border border-primary/10 text-xs"
+                >
                   <p className="font-bold text-slate-800">{rec.title}</p>
                   <p className="text-slate-600 mt-1">{rec.reason}</p>
                 </div>
@@ -45,17 +57,12 @@ const Chatbot = () => {
           );
         }
 
-        // Generic JSON display
-        return (
-          <pre className="text-[10px] bg-slate-900 text-slate-100 p-2 rounded-lg overflow-x-auto">
-            {JSON.stringify(parsed, null, 2)}
-          </pre>
-        );
+        if (parsed.response) {
+          return <p className="whitespace-pre-wrap">{parsed.response}</p>;
+        }
       }
-    } catch (e) {
-      // Not JSON or parse failed, fall back to string
-    }
-    
+    } catch (e) {}
+
     return <p className="whitespace-pre-wrap">{content}</p>;
   };
 
@@ -64,20 +71,29 @@ const Chatbot = () => {
 
     const userMessage = { role: "user", content: input };
     setMessages((prev) => [...prev, userMessage]);
+    const currentInput = input;
     setInput("");
     setIsLoading(true);
 
     try {
-      const data = await chatbotService.ask(input);
+      const data = await chatbotService.ask(currentInput);
 
-      setMessages((prev) => [
-        ...prev,
-        { role: "bot", content: data.answer },
-      ]);
+      const botReply =
+        data.response ||
+        data.answer ||
+        (typeof data === "string"
+          ? data
+          : "I received an invalid response format.");
+
+      setMessages((prev) => [...prev, { role: "bot", content: botReply }]);
     } catch (error) {
       setMessages((prev) => [
         ...prev,
-        { role: "bot", content: "Sorry, I'm having trouble thinking right now. Try again later!" },
+        {
+          role: "bot",
+          content:
+            "Sorry, I'm having trouble thinking right now. Try again later!",
+        },
       ]);
     } finally {
       setIsLoading(false);
@@ -105,7 +121,7 @@ const Chatbot = () => {
               <div>
                 <CardTitle className="text-sm font-bold">LearnHub AI</CardTitle>
                 <p className="text-[10px] opacity-80 flex items-center gap-1">
-                   <Sparkles className="w-2 h-2" /> Powered by Gemini
+                  <Sparkles className="w-2 h-2" /> Powered by Gemini
                 </p>
               </div>
             </div>
@@ -119,8 +135,8 @@ const Chatbot = () => {
             </Button>
           </CardHeader>
 
-          <CardContent className="flex-1 p-0 flex flex-col bg-slate-50/50">
-            <ScrollArea className="flex-1 p-4 pr-6 scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent" viewportRef={scrollRef}>
+          <CardContent className="flex-1 p-0 flex flex-col bg-slate-50/50 overflow-hidden">
+            <ScrollArea className="flex-1 p-4 pr-6">
               <div className="space-y-4">
                 {messages.map((msg, index) => (
                   <div
@@ -136,10 +152,13 @@ const Chatbot = () => {
                           : "bg-white border text-slate-700 rounded-tl-none"
                       }`}
                     >
-                      {msg.role === "bot" ? renderMessageContent(msg.content) : msg.content}
+                      {msg.role === "bot"
+                        ? renderMessageContent(msg.content)
+                        : msg.content}
                     </div>
                   </div>
                 ))}
+
                 {isLoading && (
                   <div className="flex justify-start">
                     <div className="bg-white border p-3 rounded-2xl rounded-tl-none shadow-sm">
@@ -147,6 +166,8 @@ const Chatbot = () => {
                     </div>
                   </div>
                 )}
+
+                <div ref={messagesEndRef} />
               </div>
             </ScrollArea>
 
@@ -158,8 +179,8 @@ const Chatbot = () => {
                 onKeyDown={(e) => e.key === "Enter" && handleSend()}
                 className="rounded-xl bg-slate-50 border-none focus-visible:ring-primary h-11"
               />
-              <Button 
-                onClick={handleSend} 
+              <Button
+                onClick={handleSend}
                 disabled={isLoading}
                 className="rounded-xl h-11 w-11 p-0 shadow-lg shadow-primary/20"
               >
