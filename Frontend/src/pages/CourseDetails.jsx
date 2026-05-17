@@ -1,53 +1,47 @@
+import React, { useState } from "react";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useParams, useNavigate, Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useAuth } from "@/contexts/AuthContext";
-import api from "@/api/axios";
+import { useAuth } from "@/hooks/useAuth"; // تأكد من مسار الـ hook الخاص بك
+import { useToast } from "@/hooks/use-toast"; // تأكد من مسار الـ toast الخاص بك
 import {
-  BookOpen,
+  User,
   Clock,
-  FileText,
   Play,
-  ShieldCheck,
-  Star,
-  Users,
+  Edit2,
+  Trash2,
   CheckCircle2,
   PlusCircle,
-  Loader2,
-  TrendingUp,
+  ClipboardList,
   MessageSquare,
-  Sparkles,
-  BrainCircuit,
-  Award,
-  User,
+  Star,
   GraduationCap,
+  Loader2,
 } from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
-import { useState } from "react";
+
+// استيراد مكونات UI الخاصة بـ shadcn/ui
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import AIQuizDialog from "@/components/AIQuizDialog";
-import { getFullUrl } from "@/lib/urlHelper";
-import orderService from "@/api/order";
 
-import enrollmentService from "@/api/enrollment";
-import lessonService from "@/api/lesson";
-import lessonProgressService from "@/api/lessonProgress";
-import reviewService from "@/api/review";
-import sectionService from "@/api/section";
-import courseService from "@/api/course";
-import examService from "@/api/exam";
-import { Trash2, Edit2, ClipboardList } from "lucide-react";
+// استيراد مكون الـ AIQuizDialog والخدمات
+import AIQuizDialog from "./AIQuizDialog";
+import { courseService } from "@/services/courseService";
+import { reviewService } from "@/services/reviewService";
+import { enrollmentService } from "@/services/enrollmentService";
+import { lessonProgressService } from "@/services/lessonProgressService";
+import { examService } from "@/services/examService";
+import { orderService } from "@/services/orderService";
+import { lessonService } from "@/services/lessonService";
+import { sectionService } from "@/services/sectionService";
 
 const CourseDetails = () => {
   const [activeLesson, setActiveLesson] = useState(null);
@@ -56,6 +50,10 @@ const CourseDetails = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // --- Helpers ---
+  const getFullUrl = (path) =>
+    path ? `https://api.example.com/uploads/${path}` : "";
 
   // Queries
   const { data: courseResponse, isLoading: isCourseLoading } = useQuery({
@@ -213,7 +211,6 @@ const CourseDetails = () => {
         studentId: user.id,
       });
     },
-
     onSuccess: () => {
       queryClient.invalidateQueries(["enrollments", "me"]);
       queryClient.invalidateQueries(["course", id]);
@@ -229,7 +226,6 @@ const CourseDetails = () => {
         setActiveLesson(sections[0].lessons[0]);
       }
     },
-
     onError: (error) => {
       toast({
         variant: "destructive",
@@ -265,9 +261,6 @@ const CourseDetails = () => {
   });
 
   const isLessonCompleted = (lessonId) => {
-    // Note: The backend currently doesn't provide a list of completed lesson IDs in GetProgress.
-    // As a workaround, we can't accurately show which lessons are completed after a refresh
-    // unless the backend is updated. For now, we'll just return false.
     return false;
   };
 
@@ -286,7 +279,8 @@ const CourseDetails = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [newContent, setNewContent] = useState({
     title: "",
-    videoFile: null,
+    lessonType: "Video",
+    mediaFile: null,
     sectionId: "",
     duration: 10,
   });
@@ -335,17 +329,15 @@ const CourseDetails = () => {
       if (finalOrder < 1) finalOrder = 1;
 
       const formData = new FormData();
-
       formData.append("sectionId", newContent.sectionId);
       formData.append("title", newContent.title.trim());
 
-      if (newContent.videoFile) {
-        formData.append("file", newContent.videoFile);
+      if (newContent.mediaFile) {
+        formData.append("file", newContent.mediaFile);
       }
 
-      formData.append("lessonType", "Video");
+      formData.append("lessonType", newContent.lessonType);
       formData.append("durationInMinutes", String(newContent.duration || 10));
-
       formData.append("order", String(finalOrder));
 
       if (isEditingLesson && selectedLesson) {
@@ -362,7 +354,8 @@ const CourseDetails = () => {
       setSelectedLesson(null);
       setNewContent({
         title: "",
-        videoFile: null,
+        lessonType: "Video",
+        mediaFile: null,
         sectionId: "",
         duration: 10,
       });
@@ -399,7 +392,8 @@ const CourseDetails = () => {
     setSelectedLesson(lesson);
     setNewContent({
       title: lesson.title,
-      videoFile: null,
+      lessonType: lesson.lessonType || "Video",
+      mediaFile: null,
       sectionId: String(lesson.sectionId),
       duration: lesson.durationInMinutes || 10,
     });
@@ -455,7 +449,7 @@ const CourseDetails = () => {
             {hasAccess && activeLesson ? (
               <video
                 key={activeLesson.lessonId}
-                src={getFullUrl(activeLesson.contentUrl, "Lesson")}
+                src={getFullUrl(activeLesson.contentUrl)}
                 controls
                 className="w-full h-full"
                 autoPlay
@@ -482,7 +476,7 @@ const CourseDetails = () => {
           </div>
 
           <Card className="border-none shadow-md">
-            {isStudentEnrolled && (
+            {isStudentEnrolled && currentEnrollment && (
               <div className="p-6 bg-primary/5 border-b space-y-3">
                 <div className="flex justify-between items-center font-bold">
                   <span>Progress</span>
@@ -541,11 +535,19 @@ const CourseDetails = () => {
                         <div
                           key={lesson.lessonId}
                           className={`flex items-center justify-between p-3 rounded cursor-pointer transition-all ${activeLesson?.lessonId === lesson.lessonId ? "bg-primary/5 border-l-4 border-primary" : "hover:bg-accent/5"}`}
-                          onClick={() =>
-                            hasAccess &&
-                            lesson.lessonType === "Video" &&
-                            setActiveLesson(lesson)
-                          }
+                          onClick={() => {
+                            if (hasAccess) {
+                              if (lesson.lessonType === "Video") {
+                                setActiveLesson(lesson);
+                              } else {
+                                // فتح ملف الـ PDF أو الـ Docx في نافذة خارجية للتحميل أو التصفح فوراً
+                                window.open(
+                                  getFullUrl(lesson.contentUrl),
+                                  "_blank",
+                                );
+                              }
+                            }
+                          }}
                         >
                           <div className="flex items-center gap-4">
                             <div
@@ -749,15 +751,14 @@ const CourseDetails = () => {
                 <div className="pt-4 border-t space-y-3">
                   <Button variant="secondary" className="w-full" asChild>
                     <Link to={`/dashboard/create-exam?courseId=${id}`}>
-                      <PlusCircle className="w-4 h-4 mr-2" />
-                      Create Final Exam
+                      <PlusCircle className="w-4 h-4 mr-2" /> Create Final Exam
                     </Link>
                   </Button>
                   {courseExams.length > 0 && (
                     <Button variant="outline" className="w-full" asChild>
                       <Link to={`/dashboard/student-results/${id}`}>
-                        <ClipboardList className="w-4 h-4 mr-2" />
-                        View Exam Results
+                        <ClipboardList className="w-4 h-4 mr-2" /> View Exam
+                        Results
                       </Link>
                     </Button>
                   )}
@@ -785,8 +786,8 @@ const CourseDetails = () => {
                 {progressData?.canTakeExam && courseExams.length > 0 && (
                   <div className="pt-4 border-t space-y-3">
                     <p className="text-sm font-medium text-muted-foreground flex items-center justify-center gap-2">
-                      <GraduationCap className="w-4 h-4 text-primary" />
-                      Course Completed!
+                      <GraduationCap className="w-4 h-4 text-primary" /> Course
+                      Completed!
                     </p>
                     {courseExams.map((exam) => (
                       <Button
@@ -795,8 +796,8 @@ const CourseDetails = () => {
                         asChild
                       >
                         <Link to={`/dashboard/exam/${exam.examId}?type=exam`}>
-                          <Play className="w-4 h-4 mr-2" />
-                          Take Final Exam: {exam.title}
+                          <Play className="w-4 h-4 mr-2" /> Take Final Exam:{" "}
+                          {exam.title}
                         </Link>
                       </Button>
                     ))}
@@ -808,7 +809,7 @@ const CourseDetails = () => {
         </div>
       </div>
 
-      {/* Instructor Modals */}
+      {/* Section Dialog */}
       <Dialog
         open={isAddingSection}
         onOpenChange={(open) => {
@@ -848,10 +849,13 @@ const CourseDetails = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Lesson Dialog */}
       <Dialog open={isAddingContent} onOpenChange={setIsAddingContent}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>New Lesson</DialogTitle>
+            <DialogTitle>
+              {isEditingLesson ? "Edit Lesson" : "New Lesson"}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-4">
             <Label>Title</Label>
@@ -861,9 +865,22 @@ const CourseDetails = () => {
                 setNewContent({ ...newContent, title: e.target.value })
               }
             />
+
+            <Label>Lesson Type</Label>
+            <select
+              className="w-full p-2 border rounded text-sm bg-background"
+              value={newContent.lessonType}
+              onChange={(e) =>
+                setNewContent({ ...newContent, lessonType: e.target.value })
+              }
+            >
+              <option value="Video">Video</option>
+              <option value="File">File (PDF, Docx)</option>
+            </select>
+
             <Label>Section</Label>
             <select
-              className="w-full p-2 border rounded"
+              className="w-full p-2 border rounded text-sm bg-background"
               value={newContent.sectionId}
               onChange={(e) =>
                 setNewContent({ ...newContent, sectionId: e.target.value })
@@ -871,30 +888,57 @@ const CourseDetails = () => {
             >
               <option value="">Select Section</option>
               {sections.map((s) => (
-                <option key={s.sectionId} value={s.sectionId}>
+                <option key={s.sectionId || s.id} value={s.sectionId || s.id}>
                   {s.title}
                 </option>
               ))}
             </select>
-            <Label>Video File</Label>
+
+            <Label>
+              {newContent.lessonType === "Video"
+                ? "Video File"
+                : "Document File"}
+            </Label>
             <Input
               type="file"
-              accept="video/*"
+              accept={
+                newContent.lessonType === "Video"
+                  ? "video/*"
+                  : ".pdf,.docx,.doc"
+              }
               onChange={(e) =>
-                setNewContent({ ...newContent, videoFile: e.target.files[0] })
+                setNewContent({ ...newContent, mediaFile: e.target.files[0] })
               }
             />
+
+            {newContent.lessonType === "Video" && (
+              <>
+                <Label>Duration (Minutes)</Label>
+                <Input
+                  type="number"
+                  value={newContent.duration}
+                  onChange={(e) =>
+                    setNewContent({
+                      ...newContent,
+                      duration: parseInt(e.target.value),
+                    })
+                  }
+                />
+              </>
+            )}
+
             <Button
               className="w-full"
               onClick={handleAddContent}
               disabled={isUploading}
             >
-              {isUploading ? "Uploading..." : "Save Lesson"}
+              {isUploading ? "Saving..." : "Save Lesson"}
             </Button>
           </div>
         </DialogContent>
       </Dialog>
 
+      {/* Review Dialog */}
       <Dialog open={isReviewing} onOpenChange={setIsReviewing}>
         <DialogContent>
           <DialogHeader>
