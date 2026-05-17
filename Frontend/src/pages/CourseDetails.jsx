@@ -197,19 +197,16 @@ const CourseDetails = () => {
           title: "Please login to continue",
           variant: "destructive",
         });
-
         navigate("/login");
         return;
       }
 
-      // FREE COURSE => DIRECT ENROLLMENT
       if (course.isFree) {
         return enrollmentService.create({
           courseId: parseInt(id),
         });
       }
 
-      // PAID COURSE => CREATE ORDER
       return orderService.create({
         courseId: parseInt(id),
       });
@@ -217,21 +214,24 @@ const CourseDetails = () => {
 
     onSuccess: () => {
       queryClient.invalidateQueries(["enrollments", "me"]);
+      queryClient.invalidateQueries(["course", id]);
       queryClient.invalidateQueries(["my-orders"]);
 
       toast({
         title: course.isFree
-          ? "Enrolled successfully!"
+          ? "Enrolled successfully! Enjoy your course."
           : "Order created successfully! Wait for admin approval.",
       });
+
+      if (course.isFree && sections[0]?.lessons[0]) {
+        setActiveLesson(sections[0].lessons[0]);
+      }
     },
 
     onError: (error) => {
       toast({
         variant: "destructive",
-
         title: course.isFree ? "Enrollment failed" : "Order creation failed",
-
         description: error.response?.data?.message || "Something went wrong",
       });
     },
