@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/hooks/useAuth"; // تأكد من مسار الـ hook الخاص بك
-import { useToast } from "@/hooks/use-toast"; // تأكد من مسار الـ toast الخاص بك
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 import {
   User,
   Clock,
@@ -540,44 +540,64 @@ const CourseDetails = () => {
                               : "hover:bg-accent/5"
                           }`}
                           onClick={() => {
-                            if (hasAccess) {
-                              // تحويل النوع لحروف صغيرة لتفادي أي لغبطة بين الكابيتال والسمول
-                              const type = lesson.lessonType?.toLowerCase();
+                            if (!hasAccess) return;
 
-                              if (type === "video") {
-                                setActiveLesson(lesson);
-                              } else if (type === "pdf" || type === "text") {
-                                // تأمين جلب الرابط من أكتر من مكان متوقع من الباك-إند
-                                const fileUrl =
-                                  lesson.contentUrl ||
-                                  lesson.pdfUrl ||
-                                  lesson.fileUrl;
+                            const type = lesson.lessonType?.toLowerCase();
 
-                                if (fileUrl) {
-                                  const fullUrl = getFullUrl(fileUrl);
-
-                                  // فتح الرابط في تبويب جديد بأمان
-                                  const newWindow = window.open(
-                                    fullUrl,
-                                    "_blank",
-                                    "noopener,noreferrer",
-                                  );
-
-                                  // خطة بديلة لو المتصفح عمل بلوك للـ window.open
-                                  if (!newWindow) {
-                                    window.location.href = fullUrl;
-                                  }
-                                } else {
-                                  console.error(
-                                    "عفواً، لم يتم العثور على رابط الملف في البيانات:",
-                                    lesson,
-                                  );
-                                  alert(
-                                    "رابط الملف الخاص بهذا الدرس غير متوفر.",
-                                  );
-                                }
-                              }
+                            // تشغيل الفيديو
+                            if (type === "video") {
+                              setActiveLesson(lesson);
+                              return;
                             }
+
+                            // فتح ملفات PDF / Text
+                            if (
+                              type === "pdf" ||
+                              type === "text" ||
+                              type === "file"
+                            ) {
+                              const fileUrl =
+                                lesson.contentUrl ||
+                                lesson.pdfUrl ||
+                                lesson.fileUrl;
+
+                              if (!fileUrl) {
+                                console.error("File URL not found:", lesson);
+
+                                toast({
+                                  variant: "destructive",
+                                  title: "File not found",
+                                  description:
+                                    "This lesson does not contain a valid file.",
+                                });
+
+                                return;
+                              }
+
+                              const fullUrl = getFullUrl(fileUrl);
+
+                              console.log("Lesson Type:", lesson.lessonType);
+                              console.log("Original URL:", fileUrl);
+                              console.log("Final URL:", fullUrl);
+
+                              // فتح الملف
+                              const link = document.createElement("a");
+
+                              link.href = fullUrl;
+                              link.target = "_blank";
+                              link.rel = "noopener noreferrer";
+
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+
+                              return;
+                            }
+
+                            console.warn(
+                              "Unsupported lesson type:",
+                              lesson.lessonType,
+                            );
                           }}
                         >
                           <div className="flex items-center gap-4">
@@ -910,11 +930,15 @@ const CourseDetails = () => {
               className="w-full p-2 border rounded text-sm bg-background"
               value={newContent.lessonType}
               onChange={(e) =>
-                setNewContent({ ...newContent, lessonType: e.target.value })
+                setNewContent({
+                  ...newContent,
+                  lessonType: e.target.value,
+                })
               }
             >
               <option value="Video">Video</option>
-              <option value="File">File (PDF, Docx)</option>
+              <option value="PDF">PDF</option>
+              <option value="Text">Text</option>
             </select>
 
             <Label>Section</Label>
