@@ -48,7 +48,7 @@ export const examService = {
   // POST /api/courses/{courseId}/generate-ai-exam (Instructor/Admin)
   generateAIExam: async (courseId, examDate, duration, requestData) => {
     const response = await api.post(
-      `/courses/${courseId}/generate-ai-exam`,
+      `/api/courses/${courseId}/generate-ai-exam`,
       requestData,
       {
         params: {

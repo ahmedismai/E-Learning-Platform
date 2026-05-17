@@ -31,19 +31,13 @@ import {
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { getFullUrl } from "@/lib/urlHelper";
 
 const AdminCategories = () => {
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
   const [formData, setFormData] = useState({ name: "", description: "", image: null });
-
-  const getFullUrl = (path) => {
-    if (!path || path === "No Image Available") return "";
-    if (path.startsWith("http")) return path;
-    const baseUrl = api.defaults.baseURL.replace("/api", "");
-    return `${baseUrl}/Images/Category/${path.replace(/\\/g, "/")}`;
-  };
 
   const { data: response, isLoading } = useQuery({
     queryKey: ["admin", "categories"],
@@ -166,7 +160,7 @@ const AdminCategories = () => {
                   <TableCell>
                     {cat.imgPath ? (
                       <img 
-                        src={getFullUrl(cat.imgPath)} 
+                        src={getFullUrl(cat.imgPath, "Category")} 
                         alt={cat.categoryName} 
                         className="w-10 h-10 rounded-full object-cover"
                       />

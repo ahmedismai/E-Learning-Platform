@@ -16,7 +16,7 @@ const accountService = {
 
   // POST /api/Account/Logout
   logout: async (refreshToken) => {
-    const response = await api.post(`/Account/Logout?refreshToken=${refreshToken}`);
+    const response = await api.post(`/api/Account/Logout?refreshToken=${refreshToken}`);
     return response.data;
   },
 
@@ -40,7 +40,7 @@ const accountService = {
 
   // DELETE /api/Account/DeleteUser/{userId} (Admin)
   deleteUser: async (userId) => {
-    const response = await api.delete(`api/Account/DeleteUser/${userId}`);
+    const response = await api.delete(`/api/Account/DeleteUser/${userId}`);
     return response.data;
   },
 

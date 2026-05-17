@@ -39,16 +39,6 @@ const Dashboard = () => {
   const availableExams = dashboardData?.availableExams || [];
   const submittedExams = dashboardData?.submittedExams || [];
 
-  const getFullUrl = (path) => {
-    if (!path || path === "No Image Available") return "/placeholder.svg";
-    if (path.startsWith("http")) return path;
-    const backendUrl = import.meta.env.PROD 
-    ? "http://e-learning-platform-3.runasp.net" 
-    : (import.meta.env.VITE_API_URL || "").replace("/api", "");
-
-  return `${backendUrl}/Images/Course/${path.replace(/\\/g, "/")}`;
-  };
-
   return (
     <div className="space-y-8 animate-fade-in max-w-7xl mx-auto pb-12">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">

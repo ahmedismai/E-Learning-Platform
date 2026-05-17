@@ -24,7 +24,7 @@ const AdminOverview = () => {
   const { data: response, isLoading } = useQuery({
     queryKey: ["admin", "stats"],
     queryFn: async () => {
-      const response = await api.get("/Dashboards/AdminDashboard");
+      const response = await api.get("/api/Dashboards/AdminDashboard");
       return response.data;
     },
   });

@@ -5,6 +5,18 @@
             "destination": "http://e-learning-platform-3.runasp.net/api/:path*"
         },
         {
+            "source": "/Images/:path*",
+            "destination": "http://e-learning-platform-3.runasp.net/Images/:path*"
+        },
+        {
+            "source": "/Videos/:path*",
+            "destination": "http://e-learning-platform-3.runasp.net/Videos/:path*"
+        },
+        {
+            "source": "/Files/:path*",
+            "destination": "http://e-learning-platform-3.runasp.net/Files/:path*"
+        },
+        {
             "source": "/(.*)",
             "destination": "/index.html"
         }

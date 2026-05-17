@@ -31,7 +31,7 @@ const InstructorOverview = () => {
   const { data: stats, isLoading } = useQuery({
     queryKey: ["instructor", "stats"],
     queryFn: async () => {
-      const response = await api.get("/Dashboards/InstructorDashboard");
+      const response = await api.get("/api/Dashboards/InstructorDashboard");
       return response.data;
     },
   });

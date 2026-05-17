@@ -43,7 +43,7 @@ const StudentManagement = () => {
     queryFn: async () => {
       const results = await Promise.all(
         courses.map(async (course) => {
-          const response = await api.get(`/Enrollment/ByCourse/${course.courseId}`);
+          const response = await api.get(`/api/Enrollment/ByCourse/${course.courseId}`);
           return response.data.data || [];
         })
       );
@@ -54,7 +54,7 @@ const StudentManagement = () => {
 
   const reissueMutation = useMutation({
     mutationFn: async ({ studentId, courseId }) => {
-      const response = await api.post("/Certificate/instructor/generate", { studentId, courseId });
+      const response = await api.post("/api/Certificate/instructor/generate", { studentId, courseId });
       return response.data;
     },
     onSuccess: (data) => {

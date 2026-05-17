@@ -27,14 +27,14 @@ const InstructorCertificates = () => {
   const { data: certificates = [], isLoading } = useQuery({
     queryKey: ["instructor", "certificates"],
     queryFn: async () => {
-      const response = await api.get("/Certificate/instructor");
+      const response = await api.get("/api/Certificate/instructor");
       return response.data;
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (id) => {
-      await api.delete(`/Certificate/${id}`);
+      await api.delete(`/api/Certificate/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["instructor", "certificates"]);

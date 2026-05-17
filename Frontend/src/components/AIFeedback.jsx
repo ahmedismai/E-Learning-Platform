@@ -11,7 +11,7 @@ const AIFeedback = ({ gradeId, initialFeedback, isReviewed }) => {
 
   const feedbackMutation = useMutation({
     mutationFn: async () => {
-      const response = await api.post("/AI-Assessment/feedback", { gradeId });
+      const response = await api.post("/api/AI-Assessment/feedback", { gradeId });
       return response.data.feedback;
     },
     onSuccess: (data) => {

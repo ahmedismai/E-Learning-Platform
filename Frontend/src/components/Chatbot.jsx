@@ -24,6 +24,41 @@ const Chatbot = () => {
     }
   }, [messages]);
 
+  const renderMessageContent = (content) => {
+    try {
+      // Try to parse if it's a JSON string
+      if (typeof content === 'string' && (content.trim().startsWith('{') || content.trim().startsWith('['))) {
+        const parsed = JSON.parse(content);
+        
+        // If it's a recommendations object
+        if (parsed.recommendations && Array.isArray(parsed.recommendations)) {
+          return (
+            <div className="space-y-3">
+              <p className="font-semibold text-primary">Here are some recommendations:</p>
+              {parsed.recommendations.map((rec, i) => (
+                <div key={i} className="bg-slate-50 p-2 rounded-lg border border-primary/10 text-xs">
+                  <p className="font-bold text-slate-800">{rec.title}</p>
+                  <p className="text-slate-600 mt-1">{rec.reason}</p>
+                </div>
+              ))}
+            </div>
+          );
+        }
+
+        // Generic JSON display
+        return (
+          <pre className="text-[10px] bg-slate-900 text-slate-100 p-2 rounded-lg overflow-x-auto">
+            {JSON.stringify(parsed, null, 2)}
+          </pre>
+        );
+      }
+    } catch (e) {
+      // Not JSON or parse failed, fall back to string
+    }
+    
+    return <p className="whitespace-pre-wrap">{content}</p>;
+  };
+
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
 
@@ -85,7 +120,7 @@ const Chatbot = () => {
           </CardHeader>
 
           <CardContent className="flex-1 p-0 flex flex-col bg-slate-50/50">
-            <ScrollArea className="flex-1 p-4" viewportRef={scrollRef}>
+            <ScrollArea className="flex-1 p-4 pr-6 scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent" viewportRef={scrollRef}>
               <div className="space-y-4">
                 {messages.map((msg, index) => (
                   <div
@@ -95,13 +130,13 @@ const Chatbot = () => {
                     }`}
                   >
                     <div
-                      className={`max-w-[80%] p-3 rounded-2xl text-sm shadow-sm ${
+                      className={`max-w-[85%] p-3 rounded-2xl text-sm shadow-sm ${
                         msg.role === "user"
                           ? "bg-primary text-primary-foreground rounded-tr-none"
                           : "bg-white border text-slate-700 rounded-tl-none"
                       }`}
                     >
-                      {msg.content}
+                      {msg.role === "bot" ? renderMessageContent(msg.content) : msg.content}
                     </div>
                   </div>
                 ))}
@@ -120,7 +155,7 @@ const Chatbot = () => {
                 placeholder="Ask me anything..."
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onKeyPress={(e) => e.key === "Enter" && handleSend()}
+                onKeyDown={(e) => e.key === "Enter" && handleSend()}
                 className="rounded-xl bg-slate-50 border-none focus-visible:ring-primary h-11"
               />
               <Button 

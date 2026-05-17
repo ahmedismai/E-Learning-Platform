@@ -22,6 +22,7 @@ import {
   CheckCircle,
   Shield,
 } from "lucide-react";
+import { getFullUrl } from "@/lib/urlHelper";
 import api from "@/api/axios";
 import enrollmentService from "@/api/enrollment";
 import orderService from "@/api/order";
@@ -35,13 +36,6 @@ const Payment = () => {
   const [isProcessing, setIsProcessing] = useState(false);
 
   const [course, setCourse] = useState(null);
-
-  const getFullUrl = (path) => {
-    if (!path) return "";
-    if (path.startsWith("http")) return path;
-    const baseUrl = api.defaults.baseURL.replace("/api", "");
-    return `${baseUrl}/${path.replace(/\\/g, "/")}`;
-  };
 
   useEffect(() => {
     const fetchCourse = async () => {

@@ -326,7 +326,7 @@ const CourseDetails = () => {
       if (newContent.videoFile) {
         formData.append("File", newContent.videoFile);
       }
-      formData.append("LessonType", "0");
+      formData.append("LessonType", "Video");
       formData.append("DurationInMinutes", String(newContent.duration));
 
       if (isEditingLesson && selectedLesson) {
@@ -431,7 +431,7 @@ const CourseDetails = () => {
             {hasAccess && activeLesson ? (
               <video
                 key={activeLesson.lessonId}
-                src={activeLesson.contentUrl}
+                src={getFullUrl(activeLesson.contentUrl, "Lesson")}
                 controls
                 className="w-full h-full"
                 autoPlay

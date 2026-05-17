@@ -28,20 +28,10 @@ import api from "@/api/axios";
 import courseService from "@/api/course";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getFullUrl } from "@/lib/urlHelper";
 
 const AdminCourses = () => {
   const queryClient = useQueryClient();
-
-  // دالة واحدة موحدة للـ URL
-  const getFullUrl = (path) => {
-    if (!path || path === "No Image Available") return "/placeholder.svg";
-    if (path.startsWith("http")) return path;
-    const backendUrl = import.meta.env.PROD 
-    ? "http://e-learning-platform-3.runasp.net" 
-    : (import.meta.env.VITE_API_URL || "").replace("/api", "");
-
-  return `${backendUrl}/Images/Course/${path.replace(/\\/g, "/")}`;
-  };
 
   const { data: response, isLoading } = useQuery({
     queryKey: ["admin", "courses"],

@@ -12,6 +12,18 @@ export default defineConfig(({ mode }) => ({
         target: "http://e-learning-platform-3.runasp.net/",
         changeOrigin: true,
       },
+      "/Images": {
+        target: "http://e-learning-platform-3.runasp.net/",
+        changeOrigin: true,
+      },
+      "/Videos": {
+        target: "http://e-learning-platform-3.runasp.net/",
+        changeOrigin: true,
+      },
+      "/Files": {
+        target: "http://e-learning-platform-3.runasp.net/",
+        changeOrigin: true,
+      },
     },
     fs: {
       allow: [

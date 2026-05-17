@@ -18,6 +18,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getFullUrl } from "@/lib/urlHelper";
 
 const Index = () => {
   const { isAuthenticated } = useAuth();
@@ -31,13 +32,6 @@ const Index = () => {
   });
 
   const courses = response?.data || [];
-
-  const getFullUrl = (path) => {
-    if (!path) return "";
-    if (path.startsWith("http")) return path;
-    const baseUrl = api.defaults.baseURL.replace("/api", "");
-    return `${baseUrl}/${path.replace(/\\/g, "/")}`;
-  };
 
   const features = [
     {

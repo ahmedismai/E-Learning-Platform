@@ -29,9 +29,11 @@ export const getFullUrl = (path, type = "Course") => {
   const folder =
     type === "Course"
       ? "Images/Course"
-      : type === "Lesson"
-        ? "Videos/Lesson"
-        : "Files/Lesson";
+      : type === "Category"
+        ? "Images/Category"
+        : type === "Lesson"
+          ? "Videos/Lesson"
+          : "Files/Lesson";
   
   return `${currentApiBaseUrl}/${folder}/${cleanPath}`;
 };

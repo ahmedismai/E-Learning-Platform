@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Play, CheckCircle, Award, Trash2, Loader2, BookOpen } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { getFullUrl } from "@/lib/urlHelper";
 
 const MyCourses = () => {
   const { user } = useAuth();
@@ -80,13 +81,6 @@ const MyCourses = () => {
         variant: "destructive",
       });
     }
-  };
-
-  const getFullUrl = (path) => {
-    if (!path) return "";
-    if (path.startsWith("http")) return path;
-    const baseUrl = api.defaults.baseURL.replace("/api", "");
-    return `${baseUrl}/${path.replace(/\\/g, "/")}`;
   };
 
   const getProgressColor = (progress) => {

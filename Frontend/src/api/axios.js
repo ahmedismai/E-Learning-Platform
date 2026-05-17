@@ -1,7 +1,8 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: import.meta.env.PROD ? "" : (import.meta.env.VITE_API_URL || "/api"),});
+  baseURL: "",
+});
 
 
 api.interceptors.request.use((config) => {
@@ -26,7 +27,7 @@ api.interceptors.response.use(
           // Wrap the refreshToken string in quotes or send as object depending on backend expectation
           // Backend is [FromBody] string refreshToken, so it expects a JSON string
           const response = await axios.post(
-            `${api.defaults.baseURL}/Account/RefreshToken`,
+            "/api/Account/RefreshToken",
             JSON.stringify(refreshToken),
             {
               headers: {

@@ -43,7 +43,7 @@ const formSchema = z.object({
   questions: z.array(
     z.object({
       questionText: z.string().min(1, "Question text is required"),
-      questionType: z.preprocess((val) => Number(val), z.number()), // 0 for MCQ based on Enum
+      questionType: z.enum(["MCQ", "TrueFalse", "Text"]), // String based enum
       marks: z.preprocess((val) => Number(val), z.number().min(1)),
       order: z.number(),
       options: z.array(
@@ -51,7 +51,7 @@ const formSchema = z.object({
           optionText: z.string().min(1, "Option text is required"),
           isCorrect: z.boolean(),
         })
-      ).min(2, "At least 2 options required"),
+      ).optional(),
     })
   ).min(1, "At least one question is required"),
 });
@@ -78,7 +78,7 @@ const CreateExam = () => {
       questions: [
         {
           questionText: "",
-          questionType: 0,
+          questionType: "MCQ",
           marks: 10,
           order: 1,
           options: [
@@ -143,7 +143,7 @@ const CreateExam = () => {
       
       const newQuestions = data.questions.map((q, idx) => ({
         questionText: q.questionText,
-        questionType: 0,
+        questionType: "MCQ",
         marks: q.marks || 10,
         order: idx + 1,
         options: q.options.map(o => ({
@@ -176,7 +176,7 @@ const CreateExam = () => {
   const addQuestion = () => {
     append({
       questionText: "",
-      questionType: 0,
+      questionType: "MCQ",
       marks: 10,
       order: fields.length + 1,
       options: [

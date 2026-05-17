@@ -2,6 +2,8 @@ import api from "./axios";
 
 const courseService = {
   // GET /api/Course
+  // Filters: name, pageNumber, pageSize, isFree
+  // SortBy: price, price_desc, title, newest
   getAll: async (params) => {
     const response = await api.get("/api/Course", { params });
     return response.data;

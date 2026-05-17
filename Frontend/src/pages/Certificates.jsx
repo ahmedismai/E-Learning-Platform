@@ -19,7 +19,7 @@ const Certificates = () => {
   } = useQuery({
     queryKey: ["certificates", "me"],
     queryFn: async () => {
-      const response = await api.get("/Certificate");
+      const response = await api.get("/api/Certificate");
       return response.data;
     },
     enabled: !!user,

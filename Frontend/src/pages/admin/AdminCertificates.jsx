@@ -27,14 +27,14 @@ const AdminCertificates = () => {
   const { data: certificates = [], isLoading } = useQuery({
     queryKey: ["admin", "certificates"],
     queryFn: async () => {
-      const response = await api.get("/Certificate/all");
+      const response = await api.get("/api/Certificate/all");
       return response.data;
     },
   });
 
   const deleteCertificateMutation = useMutation({
     mutationFn: async (id) => {
-      return await api.delete(`/Certificate/${id}`);
+      return await api.delete(`/api/Certificate/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["admin", "certificates"]);

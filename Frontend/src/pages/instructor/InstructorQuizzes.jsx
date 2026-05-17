@@ -27,7 +27,7 @@ const InstructorQuizzes = () => {
   const { data: courses = [], isLoading: isCoursesLoading } = useQuery({
     queryKey: ["instructor", "courses", user?.id],
     queryFn: async () => {
-      const response = await api.get("/Course/mine");
+      const response = await api.get("/api/Course/mine");
       return response.data;
     },
     enabled: !!user && user.role === "Instructor",
@@ -39,7 +39,7 @@ const InstructorQuizzes = () => {
     queryFn: async () => {
       const results = await Promise.all(
         courses.map(async (course) => {
-          const response = await api.get(`/Quiz/course/${course._id}`);
+          const response = await api.get(`/api/Quiz/course/${course._id}`);
           return response.data.map((q) => ({
             ...q,
             courseTitle: course.title,
