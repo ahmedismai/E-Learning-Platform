@@ -534,24 +534,59 @@ const CourseDetails = () => {
                       {section.lessons?.map((lesson, idx) => (
                         <div
                           key={lesson.lessonId}
-                          className={`flex items-center justify-between p-3 rounded cursor-pointer transition-all ${activeLesson?.lessonId === lesson.lessonId ? "bg-primary/5 border-l-4 border-primary" : "hover:bg-accent/5"}`}
+                          className={`flex items-center justify-between p-3 rounded cursor-pointer transition-all ${
+                            activeLesson?.lessonId === lesson.lessonId
+                              ? "bg-primary/5 border-l-4 border-primary"
+                              : "hover:bg-accent/5"
+                          }`}
                           onClick={() => {
                             if (hasAccess) {
-                              if (lesson.lessonType === "Video") {
+                              // تحويل النوع لحروف صغيرة لتفادي أي لغبطة بين الكابيتال والسمول
+                              const type = lesson.lessonType?.toLowerCase();
+
+                              if (type === "video") {
                                 setActiveLesson(lesson);
-                              } else {
-                                // فتح ملف الـ PDF أو الـ Docx في نافذة خارجية للتحميل أو التصفح فوراً
-                                window.open(
-                                  getFullUrl(lesson.contentUrl),
-                                  "_blank",
-                                );
+                              } else if (type === "pdf" || type === "text") {
+                                // تأمين جلب الرابط من أكتر من مكان متوقع من الباك-إند
+                                const fileUrl =
+                                  lesson.contentUrl ||
+                                  lesson.pdfUrl ||
+                                  lesson.fileUrl;
+
+                                if (fileUrl) {
+                                  const fullUrl = getFullUrl(fileUrl);
+
+                                  // فتح الرابط في تبويب جديد بأمان
+                                  const newWindow = window.open(
+                                    fullUrl,
+                                    "_blank",
+                                    "noopener,noreferrer",
+                                  );
+
+                                  // خطة بديلة لو المتصفح عمل بلوك للـ window.open
+                                  if (!newWindow) {
+                                    window.location.href = fullUrl;
+                                  }
+                                } else {
+                                  console.error(
+                                    "عفواً، لم يتم العثور على رابط الملف في البيانات:",
+                                    lesson,
+                                  );
+                                  alert(
+                                    "رابط الملف الخاص بهذا الدرس غير متوفر.",
+                                  );
+                                }
                               }
                             }
                           }}
                         >
                           <div className="flex items-center gap-4">
                             <div
-                              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${isLessonCompleted(lesson.lessonId) ? "bg-green-500 text-white" : "bg-muted"}`}
+                              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                                isLessonCompleted(lesson.lessonId)
+                                  ? "bg-green-500 text-white"
+                                  : "bg-muted"
+                              }`}
                             >
                               {isLessonCompleted(lesson.lessonId) ? (
                                 <CheckCircle2 className="w-5 h-5" />
@@ -562,12 +597,16 @@ const CourseDetails = () => {
                             <div>
                               <p className="font-semibold">{lesson.title}</p>
                               <Badge variant="outline" className="text-[10px]">
+                                {/* تحديث الـ Badge ليعبر عن الـ Enums الحقيقية بشكل أنظف */}
                                 {lesson.lessonType === "Video"
                                   ? "Video"
-                                  : "File"}
+                                  : lesson.lessonType === "PDF"
+                                    ? "PDF"
+                                    : "Text"}
                               </Badge>
                             </div>
                           </div>
+
                           <div className="flex items-center gap-2">
                             {isInstructor && (
                               <>
