@@ -204,11 +204,13 @@ const CourseDetails = () => {
       if (course.isFree) {
         return enrollmentService.create({
           courseId: parseInt(id),
+          studentId: user.id,
         });
       }
 
       return orderService.create({
         courseId: parseInt(id),
+        studentId: user.id,
       });
     },
 
