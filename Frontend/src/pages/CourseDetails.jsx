@@ -320,14 +320,30 @@ const CourseDetails = () => {
     if (!newContent.title || !newContent.sectionId) return;
     setIsUploading(true);
     try {
+      // 1️⃣ حساب الـ Order تلقائياً بناءً على عدد الدروس الموجودة في السكشن حالياً
+      const targetSection = sections.find(
+        (s) => String(s.sectionId) === String(newContent.sectionId),
+      );
+      const currentLessonsCount = targetSection?.lessons?.length || 0;
+      const nextOrder = currentLessonsCount + 1;
+
       const formData = new FormData();
       formData.append("SectionId", newContent.sectionId);
       formData.append("Title", newContent.title);
+
       if (newContent.videoFile) {
         formData.append("File", newContent.videoFile);
       }
+
       formData.append("LessonType", "Video");
-      formData.append("DurationInMinutes", String(newContent.duration));
+      formData.append("DurationInMinutes", String(newContent.duration || 10));
+
+      // ✅ 2️⃣ إضافة الـ Order الإجباري عشان يحل مشكلة الـ 400 Validation Error
+      if (isEditingLesson && selectedLesson) {
+        formData.append("Order", String(selectedLesson.order || 1));
+      } else {
+        formData.append("Order", String(nextOrder));
+      }
 
       if (isEditingLesson && selectedLesson) {
         await lessonService.update(selectedLesson.lessonId, formData);
@@ -337,7 +353,9 @@ const CourseDetails = () => {
         toast({ title: "Lesson added successfully!" });
       }
 
+      // 3️⃣ عمل تحديث للـ Queries لتجنب أي 404 أو اختفاء بيانات
       queryClient.invalidateQueries(["course", id]);
+
       setIsAddingContent(false);
       setIsEditingLesson(false);
       setSelectedLesson(null);
@@ -353,6 +371,10 @@ const CourseDetails = () => {
         title: isEditingLesson
           ? "Failed to update lesson"
           : "Failed to add lesson",
+        description:
+          error.response?.data?.errors?.Order?.[0] ||
+          error.response?.data?.title ||
+          "Validation Error",
       });
     } finally {
       setIsUploading(false);
