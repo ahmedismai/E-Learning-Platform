@@ -122,7 +122,7 @@ const CreateCourse = () => {
           title: "Success!",
           description: "Course created! You can now add sections and lessons.",
         });
-        navigate(`/api/dashboard/courses/${currentCourseId}`);
+        navigate(`/dashboard/courses/${currentCourseId}`);
       }
     } catch (error) {
       console.error("Submit Error:", error);
