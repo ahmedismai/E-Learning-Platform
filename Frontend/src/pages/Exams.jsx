@@ -33,12 +33,35 @@ const Exams = ({ isSubComponent = false }) => {
   const isAdmin = user?.role === "Admin";
 
   const { data: fetchedExams = [], isLoading } = useQuery({
-    queryKey: ["exams", user?.role],
+    queryKey: ["exams", user?.role, user?.id],
     queryFn: async () => {
       if (user?.role === "Student") {
         const response = await api.get("/api/Dashboards/StudentDashboard");
         return response.data.availableExams || [];
       }
+      
+      if (user?.role === "Instructor") {
+        // Instructors can't use getAll (403), so they must fetch per course
+        const coursesResponse = await api.get("/api/Course/MyCourses");
+        const courses = coursesResponse.data.data || [];
+        
+        const examsPromises = courses.map(async (course) => {
+          try {
+            const examRes = await examService.getByCourse(course.courseId);
+            return (examRes.data || []).map(exam => ({
+              ...exam,
+              courseTitle: course.title
+            }));
+          } catch (e) {
+            return [];
+          }
+        });
+        
+        const allExams = await Promise.all(examsPromises);
+        return allExams.flat();
+      }
+
+      // Admins can use the global endpoint
       const response = await examService.getAll();
       return response.data || [];
     },
