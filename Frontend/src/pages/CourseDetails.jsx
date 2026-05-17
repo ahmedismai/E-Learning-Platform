@@ -967,10 +967,13 @@ const CourseDetails = () => {
               accept={
                 newContent.lessonType === "Video"
                   ? "video/*"
-                  : ".pdf,.docx,.doc"
+                  : ".pdf,.doc,.docx,.txt"
               }
               onChange={(e) =>
-                setNewContent({ ...newContent, mediaFile: e.target.files[0] })
+                setNewContent({
+                  ...newContent,
+                  mediaFile: e.target.files[0],
+                })
               }
             />
 
