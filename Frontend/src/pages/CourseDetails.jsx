@@ -33,7 +33,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
 // Import AI components and services
-import AIQuizDialog from "./AiQuizDialog";
 import { courseService } from "@/services/courseService";
 import { reviewService } from "@/services/reviewService";
 import { enrollmentService } from "@/services/enrollmentService";
@@ -42,6 +41,7 @@ import { examService } from "@/services/examService";
 import { orderService } from "@/services/orderService";
 import { lessonService } from "@/services/lessonService";
 import { sectionService } from "@/services/sectionService";
+import AIQuizDialog from "./../components/AIQuizDialog";
 
 const CourseDetails = () => {
   const [activeLesson, setActiveLesson] = useState(null);
