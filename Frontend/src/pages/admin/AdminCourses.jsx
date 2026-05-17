@@ -62,13 +62,8 @@ const AdminCourses = () => {
     queryFn: () => courseService.getAll({ pageSize: 100 }),
   });
 
-  const pendingCourses = Array.isArray(pendingResponse?.data) 
-    ? pendingResponse.data 
-    : (Array.isArray(pendingResponse) ? pendingResponse : []);
-
-  const allCourses = Array.isArray(allResponse?.data) 
-    ? allResponse.data 
-    : (Array.isArray(allResponse) ? allResponse : []);
+  const pendingCourses = pendingResponse?.data?.data || pendingResponse?.data || (Array.isArray(pendingResponse) ? pendingResponse : []);
+  const allCourses = allResponse?.data?.data || allResponse?.data || (Array.isArray(allResponse) ? allResponse : []);
 
   const updateCourseStatusMutation = useMutation({
     mutationFn: async ({ courseId, status }) => {
