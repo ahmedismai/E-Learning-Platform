@@ -56,6 +56,7 @@ const DashboardSidebar = () => {
     { title: "Users", url: "/dashboard/users", icon: Users },
     { title: "Courses", url: "/dashboard/admin-courses", icon: BookOpen },
     { title: "Categories", url: "/dashboard/categories", icon: Layers },
+    { title: "Enrollments", url: "/dashboard/enrollments", icon: GraduationCap },
     { title: "Payments", url: "/dashboard/payments", icon: CreditCard },
   ];
 

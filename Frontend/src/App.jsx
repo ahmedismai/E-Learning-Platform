@@ -35,6 +35,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminCourses from "./pages/admin/AdminCourses";
 import AdminCategories from "./pages/admin/AdminCategories";
+import AdminEnrollments from "./pages/admin/AdminEnrollments";
 import AdminPayments from "./pages/admin/AdminPayments";
 import MyOrders from "./pages/MyOrders";
 import Settings from "./pages/Settings";
@@ -148,6 +149,7 @@ const App = () => (
                 <Route path="payments" element={<AdminPayments />} />
                 <Route path="my-orders" element={<MyOrders />} />
                 <Route path="categories" element={<AdminCategories />} />
+                <Route path="enrollments" element={<AdminEnrollments />} />
                 <Route path="create-exam" element={<CreateExam />} />
                 <Route path="settings" element={<Settings />} />
                 <Route path="profile" element={<Profile />} />
