@@ -53,7 +53,9 @@ const courseService = {
 
   // GET /api/Course/pending
   getPending: async () => {
-    const response = await api.get("/api/Course/pending");
+    const response = await api.get("/api/Course/pending", {
+      params: { pageNumber: 1, pageSize: 10 },
+    });
     return response.data;
   },
 
