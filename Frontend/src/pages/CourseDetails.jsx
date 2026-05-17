@@ -258,8 +258,25 @@ const CourseDetails = () => {
 
   // Validates lesson status against fetched remote list tracking completions
   const isLessonCompleted = (lessonId) => {
-    if (!progressData?.completedLessons) return false;
-    return progressData.completedLessons.includes(lessonId);
+    const completed = progressData?.completedLessons;
+
+    if (!completed) return false;
+
+    // لو array
+    if (Array.isArray(completed)) {
+      return completed.includes(lessonId);
+    }
+
+    // لو string
+    if (typeof completed === "string") {
+      return completed.split(",").map(Number).includes(Number(lessonId));
+    }
+
+    if (typeof completed === "object" && Array.isArray(completed.lessons)) {
+      return completed.lessons.includes(lessonId);
+    }
+
+    return false;
   };
 
   // --- State Variables ---
