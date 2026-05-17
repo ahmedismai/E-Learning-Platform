@@ -32,16 +32,16 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
 // Import AI components and services
-import { courseService } from "@/services/courseService";
-import { reviewService } from "@/services/reviewService";
-import { enrollmentService } from "@/services/enrollmentService";
-import { lessonProgressService } from "@/services/lessonProgressService";
-import { examService } from "@/services/examService";
-import { orderService } from "@/services/orderService";
-import { lessonService } from "@/services/lessonService";
-import { sectionService } from "@/services/sectionService";
-import AIQuizDialog from "./../components/AIQuizDialog";
 import { useAuth } from "@/contexts/AuthContext";
+import { courseService } from '@/api/course';
+import reviewService from '@/api/review';
+import { enrollmentService } from '@/api/enrollment';
+import { examService } from '@/api/exam';
+import { lessonProgressService } from '@/api/lessonProgress';
+import { orderService } from '@/api/order';
+import { lessonService } from '@/api/lesson';
+import { sectionService } from '@/api/section';
+import { AIQuizDialog } from '@/components/AIQuizDialog';
 
 const CourseDetails = () => {
   const [activeLesson, setActiveLesson] = useState(null);
@@ -72,7 +72,7 @@ const CourseDetails = () => {
 
   const { data: reviewsResponse } = useQuery({
     queryKey: ["reviews", id],
-    queryFn: () => reviewService.getAllByCourse(id),
+    queryFn: () => reviewServicee.getAllByCourse(id),
   });
 
   const reviews = reviewsResponse?.data || [];
