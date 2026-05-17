@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import {
   User,
@@ -42,6 +41,7 @@ import { orderService } from "@/services/orderService";
 import { lessonService } from "@/services/lessonService";
 import { sectionService } from "@/services/sectionService";
 import AIQuizDialog from "./../components/AIQuizDialog";
+import { useAuth } from "@/contexts/AuthContext";
 
 const CourseDetails = () => {
   const [activeLesson, setActiveLesson] = useState(null);
