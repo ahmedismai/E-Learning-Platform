@@ -31,41 +31,17 @@ const Chatbot = () => {
     if (!content) return null;
 
     try {
-      let dataToRender = content;
+      let parsedData =
+        typeof content === "string" ? JSON.parse(content) : content;
 
-      if (typeof dataToRender === "string") {
-        dataToRender = JSON.parse(dataToRender);
+      if (parsedData && typeof parsedData.recommendations === "string") {
+        parsedData.recommendations = JSON.parse(parsedData.recommendations);
       }
 
       if (
-        dataToRender &&
-        dataToRender.response &&
-        typeof dataToRender.response === "string"
-      ) {
-        try {
-          if (
-            dataToRender.response.trim().startsWith("{") ||
-            dataToRender.response.trim().startsWith("[")
-          ) {
-            dataToRender = JSON.parse(dataToRender.response);
-          }
-        } catch (e) {}
-      }
-
-      if (dataToRender && typeof dataToRender.recommendations === "string") {
-        dataToRender.recommendations = JSON.parse(dataToRender.recommendations);
-      }
-
-      const finalData = dataToRender?.recommendations
-        ? dataToRender
-        : dataToRender?.response
-          ? dataToRender
-          : null;
-
-      if (
-        finalData &&
-        finalData.recommendations &&
-        Array.isArray(finalData.recommendations)
+        parsedData &&
+        parsedData.recommendations &&
+        Array.isArray(parsedData.recommendations)
       ) {
         return (
           <div className="space-y-3 min-w-[260px]">
@@ -73,7 +49,7 @@ const Chatbot = () => {
               ✨ Here are some recommended courses for you:
             </p>
             <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-1">
-              {finalData.recommendations.map((rec, i) => (
+              {parsedData.recommendations.map((rec, i) => (
                 <div
                   key={rec.courseId || i}
                   className="bg-slate-50 p-3 rounded-xl border border-slate-200/60 hover:border-primary/30 transition-colors shadow-sm flex flex-col gap-1"
@@ -115,16 +91,14 @@ const Chatbot = () => {
         );
       }
 
-      if (content.response && typeof content.response === "string") {
-        return <p className="whitespace-pre-wrap">{content.response}</p>;
+      if (parsedData && parsedData.response) {
+        return <p className="whitespace-pre-wrap">{parsedData.response}</p>;
       }
     } catch (e) {}
 
     return (
       <p className="whitespace-pre-wrap">
-        {typeof content === "object"
-          ? content.answer || JSON.stringify(content)
-          : content}
+        {typeof content === "object" ? JSON.stringify(content) : content}
       </p>
     );
   };
@@ -140,8 +114,11 @@ const Chatbot = () => {
 
     try {
       const data = await chatbotService.ask(currentInput);
+      const botReply = data.recommendations
+        ? data
+        : data.response || data.answer || data;
 
-      setMessages((prev) => [...prev, { role: "bot", content: data }]);
+      setMessages((prev) => [...prev, { role: "bot", content: botReply }]);
     } catch (error) {
       setMessages((prev) => [
         ...prev,
