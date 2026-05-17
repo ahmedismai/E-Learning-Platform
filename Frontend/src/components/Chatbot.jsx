@@ -30,58 +30,95 @@ const Chatbot = () => {
   const renderMessageContent = (content) => {
     if (!content) return null;
 
-    if (content.recommendations && Array.isArray(content.recommendations)) {
-      return (
-        <div className="space-y-3 min-w-[260px]">
-          <p className="font-semibold text-primary text-xs flex items-center gap-1">
-            ✨ Here are some recommended courses for you:
-          </p>
-          <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-1">
-            {content.recommendations.map((rec, i) => (
-              <div
-                key={rec.courseId || i}
-                className="bg-slate-50 p-3 rounded-xl border border-slate-200/60 hover:border-primary/30 transition-colors shadow-sm flex flex-col gap-1"
-              >
-                <div className="flex justify-between items-start gap-2">
-                  <h4 className="font-bold text-slate-800 text-xs line-clamp-2 leading-tight">
-                    {rec.title}
-                  </h4>
-                  <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${
-                      rec.price === 0
-                        ? "bg-green-100 text-green-700"
-                        : "bg-blue-100 text-blue-700"
-                    }`}
-                  >
-                    {rec.price === 0 ? "Free" : `$${rec.price}`}
-                  </span>
-                </div>
+    try {
+      let dataToRender = content;
 
-                <p className="text-[11px] text-slate-600 mt-1 leading-normal italic">
-                  "{rec.reason}"
-                </p>
+      if (typeof dataToRender === "string") {
+        dataToRender = JSON.parse(dataToRender);
+      }
 
-                <div className="flex justify-between items-center mt-2 pt-1.5 border-t border-slate-100 text-[10px] text-slate-400">
-                  <span>
-                    Instructor:{" "}
-                    <strong className="text-slate-500">
-                      {rec.instructorName}
-                    </strong>
-                  </span>
-                  <span className="bg-slate-200/50 text-slate-600 px-1.5 py-0.5 rounded">
-                    {rec.categoryName}
-                  </span>
+      if (
+        dataToRender &&
+        dataToRender.response &&
+        typeof dataToRender.response === "string"
+      ) {
+        try {
+          if (
+            dataToRender.response.trim().startsWith("{") ||
+            dataToRender.response.trim().startsWith("[")
+          ) {
+            dataToRender = JSON.parse(dataToRender.response);
+          }
+        } catch (e) {}
+      }
+
+      if (dataToRender && typeof dataToRender.recommendations === "string") {
+        dataToRender.recommendations = JSON.parse(dataToRender.recommendations);
+      }
+
+      const finalData = dataToRender?.recommendations
+        ? dataToRender
+        : dataToRender?.response
+          ? dataToRender
+          : null;
+
+      if (
+        finalData &&
+        finalData.recommendations &&
+        Array.isArray(finalData.recommendations)
+      ) {
+        return (
+          <div className="space-y-3 min-w-[260px]">
+            <p className="font-semibold text-primary text-xs flex items-center gap-1">
+              ✨ Here are some recommended courses for you:
+            </p>
+            <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-1">
+              {finalData.recommendations.map((rec, i) => (
+                <div
+                  key={rec.courseId || i}
+                  className="bg-slate-50 p-3 rounded-xl border border-slate-200/60 hover:border-primary/30 transition-colors shadow-sm flex flex-col gap-1"
+                >
+                  <div className="flex justify-between items-start gap-2">
+                    <h4 className="font-bold text-slate-800 text-xs line-clamp-2 leading-tight">
+                      {rec.title}
+                    </h4>
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${
+                        rec.price === 0
+                          ? "bg-green-100 text-green-700"
+                          : "bg-blue-100 text-blue-700"
+                      }`}
+                    >
+                      {rec.price === 0 ? "Free" : `$${rec.price}`}
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] text-slate-600 mt-1 leading-normal italic">
+                    "{rec.reason}"
+                  </p>
+
+                  <div className="flex justify-between items-center mt-2 pt-1.5 border-t border-slate-100 text-[10px] text-slate-400">
+                    <span>
+                      Instructor:{" "}
+                      <strong className="text-slate-500">
+                        {rec.instructorName}
+                      </strong>
+                    </span>
+                    <span className="bg-slate-200/50 text-slate-600 px-1.5 py-0.5 rounded">
+                      {rec.categoryName}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      );
-    }
+        );
+      }
 
-    if (content.response) {
-      return <p className="whitespace-pre-wrap">{content.response}</p>;
-    }
+      if (content.response && typeof content.response === "string") {
+        return <p className="whitespace-pre-wrap">{content.response}</p>;
+      }
+    } catch (e) {}
 
     return (
       <p className="whitespace-pre-wrap">
