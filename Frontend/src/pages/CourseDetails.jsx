@@ -33,7 +33,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
 // Import AI components and services
-import AIQuizDialog from "./AIQuizDialog";
+import AIQuizDialog from "./AiQuizDialog";
 import { courseService } from "@/services/courseService";
 import { reviewService } from "@/services/reviewService";
 import { enrollmentService } from "@/services/enrollmentService";
