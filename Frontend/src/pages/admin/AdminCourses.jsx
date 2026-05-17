@@ -168,7 +168,7 @@ const AdminCourses = () => {
                   size="sm"
                   variant="ghost"
                   className="h-8 w-8 p-0"
-                  onClick={() => navigate(`/course/${course.courseId || course.id}`)}
+                  onClick={() => navigate(`/dashboard/courses/${course.courseId || course.id}`)}
                 >
                   <Eye className="w-4 h-4" />
                 </Button>
