@@ -33,15 +33,15 @@ import { Textarea } from "@/components/ui/textarea";
 
 // Import AI components and services
 import { useAuth } from "@/contexts/AuthContext";
-import { courseService } from '@/api/course';
+import  courseService  from '@/api/course';
 import reviewService from '@/api/review';
-import { enrollmentService } from '@/api/enrollment';
-import { examService } from '@/api/exam';
-import { lessonProgressService } from '@/api/lessonProgress';
-import { orderService } from '@/api/order';
-import { lessonService } from '@/api/lesson';
-import { sectionService } from '@/api/section';
-import { AIQuizDialog } from '@/components/AIQuizDialog';
+import  enrollmentService  from '@/api/enrollment';
+import  examService  from '@/api/exam';
+import  lessonProgressService  from '@/api/lessonProgress';
+import  orderService  from '@/api/order';
+import  lessonService  from '@/api/lesson';
+import  sectionService  from '@/api/section';
+import  AIQuizDialog  from '@/components/AIQuizDialog';
 
 const CourseDetails = () => {
   const [activeLesson, setActiveLesson] = useState(null);
